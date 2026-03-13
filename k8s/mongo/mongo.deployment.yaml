@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-deployment # THIS IS THE ID OF THE DEPLOYMENT
+  labels: # USED AS IDENTIFIERS FOR THAT COMPONENT. MULTIPLE REPLICAS GET UNIQUE NAME BUT SHARE SAME LABEL
+    app: mongo
+spec:
+  replicas: 1
+  selector: # ALLOWS K8S TO DETERMINE WHICH OD BELONGS TO WHICH DEPLOYMENT
+    matchLabels:
+      app: mongo
+  template: # BLUE PRINT FOR THE PODS. CONFIG OF THE POD WITHIN CONFIG OF DEPLOYMENT. CONFIGURES THE POD
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:latest
+          ports:
+            - containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongo-secret
+            - configMapRef:
+                name: mongo-config
+          # env:
+          #   - name: MONGO_INITDB_ROOT_USERNAME
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: mongo-secret
+          #         key: mongo-user
+          #   - name: MONGO_INITDB_ROOT_PASSWORD
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: mongo-secret
+          #         key: mongo-password
+---
+# SERVICE: Request comes in on port 80 and is forwarded to 27017
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service # MAPS TO THE CONFIG-MAP
+spec:
+  selector: # SELECTS PODS TO FORWARD TO REQ TO
+    app: mongo
+  ports:
+    - protocol: TCP
+      port: 27017 # THE IP OF THE SERVICE WITHIN THE CLUSTER. STANDARD IS USE SAME PORT AS POD
+      targetPort: 27017 # PORT OF THE PODS THAT BELONG TO THE SERVICE. TARGET_PORT MUST === CONTAINER_PORT

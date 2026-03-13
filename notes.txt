@@ -1,0 +1,48 @@
+What is k8s:
+    Container orchistration framework that manages containers (Docker)
+    Managed in physical, virutal, or cloud envs
+    Became popular because of microservices
+
+Features:
+    High Availability: Zero downtime
+    Scalability: Apps can be scaled up/down depending on load
+    Disaster Recovery: Backups for cases where nodes die
+
+Architecture:
+    Master Node: 
+        Main K8s process.
+        API Server: A container that is the entry point to the k8s cluster. Process different kubernetes clients will talk to
+        Controller Manager: Keeps an overview of the cluster IE: if a container needs to be restarted etc.
+        Schedular: Responsible for scheduling containers on worker nodes based on workload and available server
+            resources on each node.
+        ETCD: Backup for the cluster using key value storage in case anything goes wrong. Holds config data, state, ETC.
+        Virtual Network: Enables all nodes to talk to each other. Spans all the nodes that are part of cluster.
+            Turns all nodes in cluster into one machine that has the sum of all resources of individual nodes.
+    Worker Nodes:
+        Have kubelet process running on each node that allows clusters to communicate with each other.
+        Where the applications are running like docker containers.
+
+Components:
+    Node: Server physical/virtual machine
+        Pod: Abstraction over a container. Creates a running env (layer) on top of the container. 1 application per pod.
+            k8s offers its own virtual network where each pod gets its own IP. Pods can talk to each other
+            through the IP which is internal. Pods get a new IP on re creation. Due to this we have Service/Ingress.
+        Service: Permanent IP address that can be attached to each pod. Is also a LoadBalancer.
+        Ingress: The request goes to ingress and forwards it to the service.
+        ConfigMap: External configuration of your app. Contains configs like DB_USER, URLS, ETC. This is connected to the pod.
+        Secrets: This contains secrets like DB_PASSWORD usually stored as bas64. Secrets are not encrypted so you need to handle that.
+            You can use the data in ConfigMap/Secrets as ENVs in your app.
+        Volumes: Allows for persistance of data. Attaches a physical storage on a harddrive to your pod on your local machine
+            or remote storage (cloud storage). This is external to the k8s cluster. k8s does NOT manage data persistance.
+        Distributed Systems: Replicate all the pods on multiple servers.
+        Deployment: A bluePrint of the pods. Specify replica sets of pods. Abstraction on top of pods.
+            Database cannot be replicated through deployment because DB has state and each replica would have its own state.
+        StateFulSet: Specific for apps like DBS this allows management of replicas of DBs. 
+            Deployment is not easy so Dbs should outside of cluster.
+
+How to create pods/services:
+    K8S Configuration: All configuration goes through the master node with a process called API Server.
+        Every config file has 3 parts (MetaData, Specs, Status (automatically created/managed by k8s))
+        Status of the pod comes from ETCD.
+
+ConfigMap && Secrets need to be created before deployments       

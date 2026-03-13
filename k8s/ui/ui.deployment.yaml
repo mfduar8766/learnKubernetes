@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-deployment
+  labels: # USED AS IDENTIFIERS FOR THAT COMPONENT. MULTIPLE REPLICAS GET UNIQUE NAME BUT SHARE SAME LABEL
+    app: ui
+spec:
+  replicas: 1
+  selector: # ALLOWS K8S TO DETERMINE WHICH OD BELONGS TO WHICH DEPLOYMENT
+    matchLabels:
+      app: ui
+  template: # BLUE PRINT FOR THE PODS. CONFIG OF THE POD WITHIN CONFIG OF DEPLOYMENT. CONFIGURES THE POD
+    metadata:
+      labels:
+        app: ui
+    spec:
+      containers:
+        - name: ui
+          image: my-ui-app:v1
+          imagePullPolicy: Never # Tell K8s to look locally instead of trying to download it
+          ports:
+            - containerPort: 3000
+          envFrom: # THIS WILL TAKE THE VALUES FROM THESE FILES UNDER THE DATA: FIELD SO NAMES MUST MATCH EXACTLY
+            - configMapRef:
+                name: mongo-config
+            - secretRef:
+                name: mongo-secret
+            - secretRef:
+                name: redis-secret
+            - configMapRef:
+                name: redis-config
+          # env:
+          #   - name: MONGO_INITDB_ROOT_USERNAME
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: mongo-secret
+          #         key: mongo-user
+          #   - name: MONGO_INITDB_ROOT_PASSWORD
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: mongo-secret
+          #         key: mongo-password
+          #   - name: REDIS_PASSWORD
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: redis-secret
+          #         key: redis-password
+          #   - name: DB_URL
+          #     valueFrom:
+          #       configMapKeyRef:
+          #         name: mongo-config
+          #         key: mongo-url
+---
+# SERVICE: Request comes in on port 80 and is forwarded to 27017
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-service # MAPS TO THE CONFIG-MAP
+spec:
+  type: NodePort # DEFAULT TYPE IS ClusterIP WHICH MEANS ITS INTERNAL. NodePort MAKES IT EXTERNAL
+  selector: # SELECTS PODS TO FORWARD TO REQ TO
+    app: ui
+  ports:
+    - protocol: TCP
+      port: 3000 # THE IP OF THE SERVICE WITHIN THE CLUSTER. STANDARD IS USE SAME PORT AS POD
+      targetPort: 3000 # PORT OF THE PODS THAT BELONG TO THE SERVICE. TARGET_PORT MUST === CONTAINER_PORT
+      nodePort: 30000 # MUST BE WITHIN THE RANGE OF 30000-32767

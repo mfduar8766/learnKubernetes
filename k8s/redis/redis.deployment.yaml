@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  labels: # USED AS IDENTIFIERS FOR THAT COMPONENT. MULTIPLE REPLICAS GET UNIQUE NAME BUT SHARE SAME LABEL
+    app: redis
+spec:
+  replicas: 1
+  selector: # ALLOWS K8S TO DETERMINE WHICH OD BELONGS TO WHICH DEPLOYMENT
+    matchLabels:
+      app: redis
+  template: # BLUE PRINT FOR THE PODS. CONFIG OF THE POD WITHIN CONFIG OF DEPLOYMENT. CONFIGURES THE POD
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redisdb
+          image: bitnami/redis:latest
+          ports:
+            - containerPort: 6379
+          envFrom:
+            - secretRef:
+                name: redis-secret
+            - configMapRef:
+                name: redis-config
+          # env:
+          #   - name: REDIS_PASSWORD
+          #     valueFrom:
+          #       secretKeyRef:
+          #         name: redis-secret
+          #         key: redis-password
+---
+# SERVICE:
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service # MAPS TO THE CONFIG-MAP
+spec:
+  selector: # SELECTS PODS TO FORWARD TO REQ TO
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6379 # THE IP OF THE SERVICE WITHIN THE CLUSTER. STANDARD IS USE SAME PORT AS POD
+      targetPort: 6379 # PORT OF THE PODS THAT BELONG TO THE SERVICE. TARGET_PORT MUST === CONTAINER_PORT
