@@ -3,20 +3,24 @@ kind: Deployment
 metadata:
   name: ui-deployment
   labels: # USED AS IDENTIFIERS FOR THAT COMPONENT. MULTIPLE REPLICAS GET UNIQUE NAME BUT SHARE SAME LABEL
+    # THIS IS A KEY VALUE PAIR SO IT CAN BE ANYTHING LIKE application: ui ETC
+    # THIS IS USED BY THE SERVICE FOR MATCHING SERVICE TO DEPLOYMENT
     app: ui
-spec:
+spec: # DEPLOYMENT SPEFICICATIONS
   replicas: 1
   selector: # ALLOWS K8S TO DETERMINE WHICH OD BELONGS TO WHICH DEPLOYMENT
-    matchLabels:
+    matchLabels: # TELL DEPLOYMENT TO CONNECT/MATCH ALL LABELS BY THE SELECTOR
       app: ui
   template: # BLUE PRINT FOR THE PODS. CONFIG OF THE POD WITHIN CONFIG OF DEPLOYMENT. CONFIGURES THE POD
     metadata:
       labels:
         app: ui
-    spec:
+    spec: # POD SPECIFICATIONS
       containers:
         - name: ui
           image: my-ui-app:v1
+          # Always: Pulls from dockerHub and if the image exists locally but its a new version on DH it pulls from DH
+          # IfNotPresent: Only pulls image if it DOES NOT EXIST on the node
           imagePullPolicy: Never # Tell K8s to look locally instead of trying to download it
           ports:
             - containerPort: 3000
@@ -50,18 +54,75 @@ spec:
           #       configMapKeyRef:
           #         name: mongo-config
           #         key: mongo-url
+
+          # 1. Is the app alive? (If no, restart it)
+          # httpGet: Hits an endpoint. A response code between 200–399 is a "success." (STANDARD)
+          # exec: Runs a command inside the container (e.g., cat /tmp/healthy). If the command returns exit code 0, it's a "success."
+          # tcpSocket: Checks if a specific port is open. If the TCP connection is successful, it's a "success." (2ND CHOICE)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15 # How long to wait after the container starts before checking
+            periodSeconds: 10 # How often to perform the check
+            failureThreshold: 3 # How many times to fail before K8s gives up and takes action (restarting or removing from service
+            # 2. Is the app ready for traffic? (If no, stop sending users here)
+            successThreshold: 1
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 25
+            periodSeconds: 10 # Check every 5 seconds
+            failureThreshold: 3 # Must fail 3 times (3*5) to be removed
+            successThreshold: 1 # Only needs 1 success to be put back in rotation
 ---
-# SERVICE: Request comes in on port 80 and is forwarded to 27017
+# # SERVICE: THIS CAN BE A SEPERATE FILE LIKE ui.service.yaml BUT CONVENTION IS TO KEEP IT IN DEPLOYMENT.YAML
+
+# EXAMPLE OF INTERNAL SERVICE USING INGRESS TO EXPOSE IT OUTSIDE CLUSTER
 apiVersion: v1
 kind: Service
 metadata:
-  name: ui-service # MAPS TO THE CONFIG-MAP
+  name: ui-service
 spec:
-  type: NodePort # DEFAULT TYPE IS ClusterIP WHICH MEANS ITS INTERNAL. NodePort MAKES IT EXTERNAL
-  selector: # SELECTS PODS TO FORWARD TO REQ TO
+  type: ClusterIP
+  selector:
     app: ui
   ports:
     - protocol: TCP
-      port: 3000 # THE IP OF THE SERVICE WITHIN THE CLUSTER. STANDARD IS USE SAME PORT AS POD
-      targetPort: 3000 # PORT OF THE PODS THAT BELONG TO THE SERVICE. TARGET_PORT MUST === CONTAINER_PORT
-      nodePort: 30000 # MUST BE WITHIN THE RANGE OF 30000-32767
+      port: 3000 # 2. OPTIONAL: Change to 80 so you don't have to type :3000 in the browser. ONLLY IF USING LoadBalancer
+      targetPort: 3000 # 3. KEEP THIS: This must still match your containerPort
+
+# EXAMPLE OF EXTERNAL SERVICE NO INGRESS USING NodePort
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: ui-service # MAPS TO THE CONFIG-MAP
+# spec:
+#   # ClusterIP: Default IP. IP that is ONLY reachable inside the cluster
+#   # NodePort: Opens up a PORT on every single Node(Server) in the cluster
+#   # LoadBalancer - Same as NOdePort but used for cloud providers (GCP/AWSAzure)
+#   type: NodePort # DEFAULT TYPE IS ClusterIP WHICH MEANS ITS INTERNAL. NodePort MAKES IT EXTERNAL
+#   selector: # CREATES A CONNECTION BETWEEN THE SERVICE AND DEPLOYMENT AND ITS PODS BASED ON THE KEY app: ui
+#     app: ui
+#   ports:
+#     - protocol: TCP
+#       port: 3000 # THE IP OF THE SERVICE WITHIN THE CLUSTER. STANDARD IS USE SAME PORT AS POD
+#       targetPort: 3000 # PORT OF THE PODS THAT BELONG TO THE SERVICE. TARGET_PORT CAN === CONTAINER_PORT OR BE DIFFERENT
+#       nodePort: 30000 # MUST BE WITHIN THE RANGE OF 30000-32767. IF type === LoadBalancer YOU DONT NEED THIS
+
+# EXAMPLE OF EXTERNAL SERVICE NO INGRESS USING LoadBalancer WHICH DOES NOT NEED NodePort
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: ui-service
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app: ui
+#   ports:
+#     - protocol: TCP
+#       port: 3000 # 2. OPTIONAL: Change to 80 so you don't have to type :3000 in the browser. ONLLY IF USING LoadBalancer
+#       targetPort: 3000 # 3. KEEP THIS: This must still match your containerPort
+#       # nodePort: 30000 # 4. DELETE THIS: K8s will assign one automatically if needed

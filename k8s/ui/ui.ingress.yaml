@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx # Add this for older/stricter versions
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: myk8sapptest.com # Change this to your actual domain. Requests to this domain MUST BE FORWARDED TO ui-service
+      # THIS DOES NOT CORRESPOND TO THE BROWSERS htt:// ATTRIBUTE. INCOMING REQ GETS FORWARDED TO INTERNAL SERVICE
+      # THIS IS THE 2ND STEP. STEPS are browser req -> ingress (1ST STEP) ingress -> service (2ND STEP)
+      http:
+        paths:
+          # - path: /api
+          #   pathType: Prefix
+          #   backend:
+          #     service:
+          #       name: api-service
+          #       port:
+          #         number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-service # MUST match your Service name
+                port:
+                  number: 3000 # MUST match your Service port
