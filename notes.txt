@@ -16,14 +16,34 @@ Architecture:
         Schedular: Responsible for scheduling containers on worker nodes based on workload and available server
             resources on each node.
         ETCD: Backup for the cluster using key value storage in case anything goes wrong. Holds config data, state, ETC.
+            You need to manually do the backup storage as k8s does not do this for you.
         Virtual Network: Enables all nodes to talk to each other. Spans all the nodes that are part of cluster.
             Turns all nodes in cluster into one machine that has the sum of all resources of individual nodes.
     Worker Nodes:
         Have kubelet process running on each node that allows clusters to communicate with each other.
         Where the applications are running like docker containers.
+======================================================================================================================================================================
 
 Components:
-    Node: Server physical/virtual machine
+    Node: Server physical/virtual machine. Main component of k8s. Each Node has multiple Pods running on that node.
+        It does this by installing 3 processess in every node.
+        1st. Container runtime: (Docker).
+        2nd. Kubelet: Schedular for the pods and containers. Interfaces with the container runtime and the node.
+            It is responsiible for starting a pod with a container inside and assigning resources from that node to that container.
+        3rd. Kube Proxy: Responsible for LoadBalancing from pods to pods.
+
+        Master Node: Responsible for scheduling, monitoring, and restarting pods, join a new node.
+            1. API Server: When you want to deploy a new app in the cluster this is a cluster gateway which gets requests
+                to the cluster. Acts as gatekeeper for authentication. 
+                Example some request->API Server->request validation->other processess->pod
+            2. Schedular: API Server -> validate request and sends it to Schedular. THis will start the pod on a worker node.
+                Determines what node to schedule it  in. hecks the resources the app needs and goes through worker nodes to 
+                check for available resources and schedule the new pod on that node. It does not execute the scheduling. 
+                Kubelet gets the request from Schedular and executes that request on the node.
+            3. Controller Manager: Detect state changes of pods (crashing/dying) it tries to recover the state. 
+                Makes a request to Schedular to restart pods.
+            4. ETCD: This is the cache for the cluster state.
+
         Pod: Abstraction over a container. Creates a running env (layer) on top of the container. 1 application per pod.
             k8s offers its own virtual network where each pod gets its own IP. Pods can talk to each other
             through the IP which is internal. Pods get a new IP on re creation. Due to this we have Service/Ingress.
@@ -46,3 +66,120 @@ How to create pods/services:
         Status of the pod comes from ETCD.
 
 ConfigMap && Secrets need to be created before deployments       
+
+Config File: Has 3 parts to a config file.
+    1. MetaData: Deployment MetaData
+        name: Deployment name
+        labels: Unique identifier for the deployment. Multiple replicas get unique name but share the label.
+    2. Specification: attributes will be specific to the kind of component you are creating
+    3. Status: Automatically managed by k8s
+======================================================================================================================================================================
+
+Probes:
+Liveness vs. Readiness (The Big Distinction)
+This is where most people get tripped up. Think of it like a restaurant:
+    Ways to check Liveness && Readiness (HttpGet/TcpSocket most common):
+        1. httpGet: Hits an endpoint. A response code between 200–399 is a "success."
+        2. exec: Runs a command inside the container (e.g., cat /tmp/healthy). If the command returns exit code 0, it's a "success."
+        3. tcpSocket: Checks if a specific port is open. If the TCP connection is successful, it's a "success."
+    Parameters:
+        1. initialDelaySeconds: How long to wait after the container starts before checking.
+        2. periodSeconds: How often to perform the check.
+        3. failureThreshold: How many times to fail before K8s gives up and takes action (restarting or removing from service).
+        4. successThreshol: Only needs 1 success to be put back in rotation.
+            Liveness: MUST ONLY BE 1
+            Readiness: Can be greater than 1
+    Liveness Probe: Checks if the container is still running. If this fails, K8s restarts the container.
+    Readiness Probe: Checks if the container is ready to accept traffic.
+        If this fails, the Pod is removed from the Service's load balancer so users don't hit an error page.
+    Startup Probe: Disables liveness and readiness checks until the container has fully started. This is great
+     for "slow-starting" legacy apps.
+======================================================================================================================================================================
+
+Services:
+    The Three Ports Explained
+    Port Name	Where it lives  Who uses it?
+    nodePort	The Worker Node's IP. External Users. They hit http://<Node-IP>:30000.
+    port	    The Service's Internal Cluster IP. Other Pods in the cluster. They hit http://ui-service:3000.
+    targetPort	The Pod's IP. The Service. It forwards traffic here. It must match your containerPort in the Deployment.
+        NOTE: If targetPort is NOT defined K8S will use sane value as port.
+
+The Breakdown: port-forward vs. NodePort
+    1. kubectl port-forward (The Tunnel)
+        When you run $K8S_CMD port-forward svc/ui-service 3000:3000:
+        Local Port (3000): Your laptop starts listening on 127.0.0.1:3000.
+        Service Port (3000): It connects to the port defined in your Service YAML.
+            The Result: Traffic goes from your machine → Kube-API Server → Service → Pod.
+        NodePort status: It is completely ignored. You could set nodePort: 32000 or delete it entirely, and port-forward would still work.
+    2. NodePort (The Front Door)
+        If you don't use port-forward, you access the app using the nodePort you defined:
+        URL: http://<worker-node-ip>:30000
+        The Result: Traffic hits the actual physical (or virtual) IP of your Kubernetes node on that specific high-range port.
+        Use Case: This is how "real" external traffic enters the cluster if you don't have a cloud LoadBalancer.
+
+NodePort vs LoadBalancer:
+                   NodePort	                                        LoadBalancer
+How you access it: http://<Node-IP>:30000	                        http://<Cool-Unique-Name>.com or a Static IP
+Port: Must be in the high 30000+ range	                            Can be standard Port 80 or 443
+Infrastructure:	Uses the existing Worker Nodes                      Creates a new cloud resource (costs money!)
+Reliability:	If that specific Node goes down, the URL fails	    High Availability; it tracks all nodes automatically
+
+How the Traffic Flow Changes
+With NodePort:
+    User → Specific Node IP:30000 → Service → Pod
+    Problem: If you have 10 nodes, which IP do you give your users?
+    If that node dies, your app "disappears" for the user even if the other 9 nodes are fine.
+With LoadBalancer:
+User → Load Balancer IP (Port 80) → All Nodes (NodePort) → Service → Pod
+    Solution: The Load Balancer acts as a single "Front Door." It sits in front of all your nodes.
+    If Node A dies, the Load Balancer just sends traffic to Node B.
+======================================================================================================================================================================
+
+NameSpaces: Used to organize resources in a cluster. LIke a virtual cluster inside the existing cluster.
+SHOULD NOT USE FOR SMALLER PROJECTS
+    Can be created with the commands or using a config file.
+        CMD: 
+        kubectl create namespace <NAME>
+        kubectl delete nameSpace <NAME>
+    Each NameSpace MUST have its own configMap/secret for a shared resource.
+        Example:
+            NameSpace A have a configMap/secret to the DB NameSpace B wants to also use the DB,
+            NameSpace A && B need to have independent configMaps/secret to reference the DB.
+    NameSpaces CAN SHARE services
+    Some components are NOT nameSpace specific they are global:
+        Volumes/persistant Volumes
+    When to use NameSpaces:
+        1. When theres to many resources example to many services/deployments/replicas/configMaps
+            Can have a Db nameSpace or a Monitoring nameSpace for prometheus graphana etc.
+        2. Multiple teams same application. Example two teams have same deployment name and one team deploys a new version.
+            This will override team 1s deployment.
+        3. Resource sharing IE: development/staging clusters.
+        4. Using Blue/Green Deployment, which means in same cluster you have 2 different versions of production
+        5. Access and Resource Limits: 2 teams and each team can only use their own namespace and not touch others.
+            Define CPU/RAM each NameSpaces can use.
+1. Kube System: Do NOT create/modify this.
+    Holds system procesases
+    Master and kubectl processes
+2. Kube Public: Holds publicly accessible data.
+    Has a configMap that contains cluster information that is accessible without authentication. Example: kubectl cluster-info command.
+3. Kube Node Lease: Holds information on the heartBeats of nodes.
+4. Default: Used as default nameSpace for resources.
+======================================================================================================================================================================
+
+Ingress Vs External Service: 
+    Generally External Service should only be for testing. Example K8s cluster has a UI app.
+    UI.App -> UI.Service (This uses an external port to expose the UI to the user). For testing.
+        http://127.0.0.1:333
+    UI.App -> UI.Service (Becomes Internal Service ClusterIP) -> UI.Ingress.
+        Flow: Request -> UI.ingress -> UI.Service -> UI.App
+        https://myApp.com
+For ingress you need a ingressController (Install ingress pod in your cluster) along with the .YAML file.
+IngresController: Handles processing and evaluation of ingress rules and is the entry point to the cluster.
+To install ingress you need to run: minikube addons enable ingress
+    This installs K8S implimentation of Nginx Ingress Controller
+
+The "Traffic Map"
+    You go to http://myapp.com in your browser. (The browser assumes Port 80).
+    Minikube Tunnel receives that on Port 80 and hands it to the Ingress Controller.
+    Ingress Controller looks at your YAML and says: "Aha! This goes to ui-service on Port 3000."
+    ui-service receives it on 3000 and sends it to your Container on 3000.

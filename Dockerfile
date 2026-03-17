@@ -10,6 +10,10 @@ RUN go mod download && go mod verify
 # Make sure you ran 'templ generate' on your host machine before this!
 COPY . .
 
+RUN go vet ./...
+
+RUN go test ./...
+
 # If we dont want to build it from src and just do it in the dockerfile do this
 # RUN go install github.com/a-h/templ/cmd/templ@latest
 # RUN templ generate
