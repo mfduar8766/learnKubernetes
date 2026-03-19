@@ -24,12 +24,13 @@ spec:
                 name: redis-secret
             - configMapRef:
                 name: redis-config
-          # env:
-          #   - name: REDIS_PASSWORD
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: redis-secret
-          #         key: redis-password
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data/redis # Where data is stored in the container
+      volumes:
+        - name: redis-storage
+          persistentVolumeClaim:
+            claimName: redis-pvc
 ---
 # SERVICE:
 apiVersion: v1

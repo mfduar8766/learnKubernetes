@@ -183,3 +183,17 @@ The "Traffic Map"
     Minikube Tunnel receives that on Port 80 and hands it to the Ingress Controller.
     Ingress Controller looks at your YAML and says: "Aha! This goes to ui-service on Port 3000."
     ui-service receives it on 3000 and sends it to your Container on 3000.
+
+root:
+    /api
+        /users
+            main.go -> This is another service
+            Dockerfile
+    /k8s
+    /handlers
+    /lib
+    /views
+    main.go
+    go,mod
+    start.sh
+    Dockerfile

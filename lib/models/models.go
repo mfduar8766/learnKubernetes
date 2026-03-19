@@ -1,6 +1,11 @@
 package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/mfduar8766/learnKubernetes/lib/events"
+	"github.com/mfduar8766/learnKubernetes/lib/types"
+)
 
 type Posts struct {
 	UserID int    `json:"userId"`
@@ -9,15 +14,35 @@ type Posts struct {
 	Body   string `json:"body"`
 }
 
-type User struct {
-	UserID int    `json:"userId"`
-	ID     int    `json:"id"`
-	Token  string `json:"token"`
+type ResponsePayloadParams struct {
+	Result types.ResponsePayloadResults `json:"result"`
+	Data   any
+}
+
+type MessagePayload struct {
+	Event    events.UserEventsType `json:"event"`
+	*Params  `json:"params,omitempty"`
+	Response *ResponsePayloadParams `json:"response,omitempty"`
+	Error    map[string]any         `json:"error,omitempty"`
+}
+
+func CreateNewMessagePayload(event events.UserEvents, params *Params, response *ResponsePayloadParams, errorMessage map[string]interface{}) *MessagePayload {
+	return &MessagePayload{
+		Event:    events.UserEventsType(event),
+		Params:   params,
+		Response: response,
+		Error:    errorMessage,
+	}
+}
+
+func (m *MessagePayload) Marshall() ([]byte, error) {
+	messageBytes, err := json.Marshal(m)
+	return messageBytes, err
 }
 
 type Request[T any] struct {
-	ApiName string `json:"apiName"`
-	Body    T      `json:"body"`
+	MetaData map[string]any `json:"metaData"`
+	Body     T              `json:"body"`
 }
 
 func (r *Request[T]) Marshal() ([]byte, error) {

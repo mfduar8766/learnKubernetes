@@ -3,14 +3,14 @@ package mongoDb
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 
+	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func ConnectToMongo(ctx context.Context, logger *slog.Logger) (*mongo.Client, error) {
+func ConnectToMongo(ctx context.Context, log *logger.Logger) (*mongo.Client, error) {
 	defaultHost := "mongo-service:27017"
 
 	user := os.Getenv("MONGO_INITDB_ROOT_USERNAME")
@@ -18,7 +18,7 @@ func ConnectToMongo(ctx context.Context, logger *slog.Logger) (*mongo.Client, er
 	host := os.Getenv("MONGO_HOST")
 
 	if host == "" || user == "" || pass == "" {
-		logger.Warn("Mongo::ConnectToMongo()::Mongo env vars missing, using defaults", "host", defaultHost)
+		log.LogWarnf("Mongo::ConnectToMongo()::Mongo env vars missing, using defaultHost: %s", defaultHost)
 		if host == "" {
 			host = defaultHost
 		}
@@ -32,7 +32,7 @@ func ConnectToMongo(ctx context.Context, logger *slog.Logger) (*mongo.Client, er
 
 	mongoDSN := fmt.Sprintf("mongodb://%s:%s@%s", user, pass, host)
 
-	logger.Info("Mongo::ConnectToMongo()::Attempting Mongo connection", "DSN", fmt.Sprintf("mongodb://%s:****@%s", user, host))
+	log.LogInfof("Mongo::ConnectToMongo()::Attempting Mongo connection: mongodb://%s:****@%s", user, host)
 
 	clientOptions := options.Client().ApplyURI(mongoDSN)
 
@@ -46,6 +46,6 @@ func ConnectToMongo(ctx context.Context, logger *slog.Logger) (*mongo.Client, er
 		return nil, err
 	}
 
-	logger.Info("Mongo::ConnectToMongo()::Connected to MongoDB")
+	log.LogInfof("Mongo::ConnectToMongo()::Connected to MongoDB")
 	return client, nil
 }
