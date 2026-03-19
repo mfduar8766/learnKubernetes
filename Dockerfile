@@ -20,7 +20,11 @@ RUN go test ./...
 
 # 3. Build with CGO disabled for a "static" binary 
 # (This prevents 'file not found' errors in K8s)
-RUN CGO_ENABLED=0 go build -v -o /usr/local/bin/app .
+# RUN CGO_ENABLED=0 go build -v -o /usr/local/bin/app .
 
-# 4. Set the binary to run
-CMD ["/usr/local/bin/app"]
+# # 4. Set the binary to run
+# CMD ["/usr/local/bin/app"]
+
+RUN CGO_ENABLED=0 go build -v -o /usr/local/bin/gateway-exe .
+
+CMD ["/usr/local/bin/gateway-exe"]

@@ -1,29 +1,30 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ui-deployment
+  name: gateway-deployment
   labels: # USED AS IDENTIFIERS FOR THAT COMPONENT. MULTIPLE REPLICAS GET UNIQUE NAME BUT SHARE SAME LABEL
-    # THIS IS A KEY VALUE PAIR SO IT CAN BE ANYTHING LIKE application: ui ETC
+    # THIS IS A KEY VALUE PAIR SO IT CAN BE ANYTHING LIKE application: gateway ETC
     # THIS IS USED BY THE SERVICE FOR MATCHING SERVICE TO DEPLOYMENT
-    app: ui
+    app: gateway
 spec: # DEPLOYMENT SPEFICICATIONS
   replicas: 1
   selector: # ALLOWS K8S TO DETERMINE WHICH OD BELONGS TO WHICH DEPLOYMENT
     matchLabels: # TELL DEPLOYMENT TO CONNECT/MATCH ALL LABELS BY THE SELECTOR
-      app: ui
+      app: gateway
   template: # BLUE PRINT FOR THE PODS. CONFIG OF THE POD WITHIN CONFIG OF DEPLOYMENT. CONFIGURES THE POD
     metadata:
       labels:
-        app: ui
+        app: gateway
     spec: # POD SPECIFICATIONS
       containers:
-        - name: ui
-          image: my-ui-app:v1
+        - name: gateway
+          image: gateway-app:v1
           # Always: Pulls from dockerHub and if the image exists locally but its a new version on DH it pulls from DH
           # IfNotPresent: Only pulls image if it DOES NOT EXIST on the node
           imagePullPolicy: Never # Tell K8s to look locally instead of trying to download it
           ports:
             - containerPort: 3000
+            # envFrom IS PROCCESSED FIRST THEN env:
           envFrom: # THIS WILL TAKE THE VALUES FROM THESE FILES UNDER THE DATA: FIELD SO NAMES MUST MATCH EXACTLY
             - configMapRef:
                 name: mongo-config
@@ -33,6 +34,13 @@ spec: # DEPLOYMENT SPEFICICATIONS
                 name: redis-secret
             - configMapRef:
                 name: redis-config
+            - secretRef:
+                name: rmq-secret
+            - configMapRef:
+                name: rmq-config
+          env:
+            - name: RABBITMQ_URI
+              value: "amqp://$(RABBITMQ_DEFAULT_USER):$(RABBITMQ_DEFAULT_PASS)@$(RABBITMQ_HOST)"
           # env:
           #   - name: MONGO_INITDB_ROOT_USERNAME
           #     valueFrom:
@@ -78,34 +86,35 @@ spec: # DEPLOYMENT SPEFICICATIONS
             failureThreshold: 3 # Must fail 3 times (3*5) to be removed
             successThreshold: 1 # Only needs 1 success to be put back in rotation
 ---
-# # SERVICE: THIS CAN BE A SEPERATE FILE LIKE ui.service.yaml BUT CONVENTION IS TO KEEP IT IN DEPLOYMENT.YAML
+# # SERVICE: THIS CAN BE A SEPERATE FILE LIKE gateway.service.yaml BUT CONVENTION IS TO KEEP IT IN DEPLOYMENT.YAML
 
 # EXAMPLE OF INTERNAL SERVICE USING INGRESS TO EXPOSE IT OUTSIDE CLUSTER
 apiVersion: v1
 kind: Service
 metadata:
-  name: ui-service
+  name: gateway-service
 spec:
   type: ClusterIP
   selector:
-    app: ui
+    app: gateway
   ports:
     - protocol: TCP
       port: 3000 # 2. OPTIONAL: Change to 80 so you don't have to type :3000 in the browser. ONLLY IF USING LoadBalancer
       targetPort: 3000 # 3. KEEP THIS: This must still match your containerPort
 
+
 # EXAMPLE OF EXTERNAL SERVICE NO INGRESS USING NodePort
 # apiVersion: v1
 # kind: Service
 # metadata:
-#   name: ui-service # MAPS TO THE CONFIG-MAP
+#   name: gateway-service # MAPS TO THE CONFIG-MAP
 # spec:
 #   # ClusterIP: Default IP. IP that is ONLY reachable inside the cluster
 #   # NodePort: Opens up a PORT on every single Node(Server) in the cluster
 #   # LoadBalancer - Same as NOdePort but used for cloud providers (GCP/AWSAzure)
 #   type: NodePort # DEFAULT TYPE IS ClusterIP WHICH MEANS ITS INTERNAL. NodePort MAKES IT EXTERNAL
-#   selector: # CREATES A CONNECTION BETWEEN THE SERVICE AND DEPLOYMENT AND ITS PODS BASED ON THE KEY app: ui
-#     app: ui
+#   selector: # CREATES A CONNECTION BETWEEN THE SERVICE AND DEPLOYMENT AND ITS PODS BASED ON THE KEY app: gateway
+#     app: gateway
 #   ports:
 #     - protocol: TCP
 #       port: 3000 # THE IP OF THE SERVICE WITHIN THE CLUSTER. STANDARD IS USE SAME PORT AS POD
@@ -116,11 +125,11 @@ spec:
 # apiVersion: v1
 # kind: Service
 # metadata:
-#   name: ui-service
+#   name: gateway-service
 # spec:
 #   type: LoadBalancer
 #   selector:
-#     app: ui
+#     app: gateway
 #   ports:
 #     - protocol: TCP
 #       port: 3000 # 2. OPTIONAL: Change to 80 so you don't have to type :3000 in the browser. ONLLY IF USING LoadBalancer

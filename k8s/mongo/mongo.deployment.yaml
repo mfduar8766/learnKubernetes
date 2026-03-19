@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mongo-deployment # THIS IS THE ID OF THE DEPLOYMENT
-  labels: # USED AS IDENTIFIERS FOR THAT COMPONENT. MULTIPLE REPLICAS GET UNIQUE NAME BUT SHARE SAME LABEL
+  name: mongo-deployment
+  labels:
     app: mongo
 spec:
   replicas: 1
-  selector: # ALLOWS K8S TO DETERMINE WHICH OD BELONGS TO WHICH DEPLOYMENT
+  selector:
     matchLabels:
       app: mongo
-  template: # BLUE PRINT FOR THE PODS. CONFIG OF THE POD WITHIN CONFIG OF DEPLOYMENT. CONFIGURES THE POD
+  template:
     metadata:
       labels:
         app: mongo
@@ -17,6 +17,9 @@ spec:
       containers:
         - name: mongodb
           image: mongo:latest
+          # --- MANDATORY FOR apt-get TO WORK ---
+          # securityContext:
+          #   runAsUser: 0
           ports:
             - containerPort: 27017
           envFrom:
@@ -24,17 +27,34 @@ spec:
                 name: mongo-secret
             - configMapRef:
                 name: mongo-config
-          # env:
-          #   - name: MONGO_INITDB_ROOT_USERNAME
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: mongo-secret
-          #         key: mongo-user
-          #   - name: MONGO_INITDB_ROOT_PASSWORD
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: mongo-secret
-          #         key: mongo-password
+          # lifecycle:
+          #   postStart:
+          #     exec:
+          #       command:
+          #         - /bin/sh
+          #         - -c
+          #         - >
+          #           if ! command -v mongoimport &> /dev/null; then
+          #             apt-get update && apt-get install -y mongodb-database-tools;
+          #           fi;
+          #           sleep 5;
+          #           mongoimport --host localhost \
+          #           --username $(MONGO_INITDB_ROOT_USERNAME) \
+          #           --password $(MONGO_INITDB_ROOT_PASSWORD) \
+          #           --authenticationDatabase admin \
+          #           --db test --collection users --type json --file /data/init/initDb.json --jsonArray --upsert
+          volumeMounts:
+            - name: init-data-volume
+              mountPath: /data/init # Where the JSON file sits
+            - name: mongo-storage # Where the actual DB lives
+              mountPath: /data/db
+      volumes:
+        - name: init-data-volume
+          configMap:
+            name: mongo-init-data # The JSON from your script
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc # The persistent storage
 ---
 # SERVICE: Request comes in on port 80 and is forwarded to 27017
 apiVersion: v1

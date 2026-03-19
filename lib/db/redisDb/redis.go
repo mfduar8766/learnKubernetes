@@ -2,25 +2,24 @@ package redisDb
 
 import (
 	"context"
-	"log"
-	"log/slog"
 	"os"
 	"time"
 
+	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/redis/go-redis/v9"
 )
 
-func ConnectToRedis(ctx context.Context, logger *slog.Logger) *redis.Client {
+func ConnectToRedis(ctx context.Context, log *logger.Logger) *redis.Client {
 	var (
 		redisHost     = "redis-service:6379"
 		redisPassword = "password"
 	)
 
 	if host := os.Getenv("REDIS_URL"); len(host) == 0 {
-		logger.Error("Redis::connectToRedis()::No redis host configured. Using default host instead")
+		log.LogErrorf("Redis::connectToRedis()::No redis host configured. Using default host instead")
 	}
 	if password := os.Getenv("REDIS_PASSWORD"); len(password) == 0 {
-		logger.Error("Redis::connectToRedis()::No redis password configured. Using default password instead")
+		log.LogErrorf("Redis::connectToRedis()::No redis password configured. Using default password instead")
 	}
 
 	redisClient := redis.NewClient(&redis.Options{
@@ -34,8 +33,8 @@ func ConnectToRedis(ctx context.Context, logger *slog.Logger) *redis.Client {
 	})
 	_, err := redisClient.Ping(ctx).Result()
 	if err != nil {
-		log.Fatalf("Redis::connectToRedis()::Failed to connect to Redis: %v", err)
+		log.LogErrorf("Redis::connectToRedis()::Failed to connect to Redis: %v", err.Error())
 	}
-	logger.Info("Redis::connectToRedis()::connected to redis", "host", redisHost)
+	log.LogInfof("Redis::connectToRedis()::connected to redis:%+v", redisHost)
 	return redisClient
 }

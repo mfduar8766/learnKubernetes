@@ -1,0 +1,26 @@
+[
+  {
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "test@gmail.com",
+    "age": 21,
+    "password": "testPassword21!",
+    "roles": [
+      "ADMIN",
+      "SUPER_USER"
+    ],
+    "createdAt": "2024-01-05 15:20:28.836715 +0000 UTC"
+  },
+  {
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "email": "test@gmail.com",
+    "age": 22,
+    "password": "testPassword22!",
+    "roles": [
+      "ADMIN",
+      "SUPER_USER"
+    ],
+    "createdAt": "2024-01-05 15:20:28.836738 +0000 UTC"
+  }
+]

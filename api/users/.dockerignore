@@ -1,0 +1,19 @@
+# Ignore infrastructure
+k8s/
+scripts/
+*.sh
+
+# Ignore local Go build artifacts
+bin/
+vendor/
+
+# Ignore local environment/secrets
+.env
+*.secret.yaml
+
+# Ignore Git
+.git
+.gitignore
+
+# If you use templ, don't ignore the _templ.go files! 
+# They are needed for the build

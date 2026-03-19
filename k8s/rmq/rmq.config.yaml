@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rmq-config
+  # namespace: myNameSpace
+data:
+  RABBITMQ_HOST: "rmq-service:5672"

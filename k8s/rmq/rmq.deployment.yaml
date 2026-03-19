@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rmq-deployment
+  labels:
+    app: rmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rmq
+  template:
+    metadata:
+      labels:
+        app: rmq
+    spec:
+      hostname: rabbitmq
+      containers:
+        - name: rmq
+          image: rabbitmq:3.13-rc-management-alpine
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rmq-secret
+                  key: RABBITMQ_DEFAULT_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rmq-secret
+                  key: RABBITMQ_DEFAULT_PASS
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: rmq-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_URI
+              value: "amqp://$(RABBITMQ_DEFAULT_USER):$(RABBITMQ_DEFAULT_PASS)@$(RABBITMQ_HOST)"
+
+          # --- VOLUME MOUNT ---
+          volumeMounts:
+            - name: rmq-data
+              mountPath: /var/lib/rabbitmq
+
+          # --- UPDATED HEALTH CHECKS ---
+          # We use 'exec' to match your Docker Compose 'rabbitmq-diagnostics' check
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+
+      # --- VOLUME DEFINITION ---
+      volumes:
+        - name: rmq-data
+          hostPath:
+            # On Minikube, this stores the data on the Minikube node
+            path: /data/rabbitmq
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rmq-service
+spec:
+  type: ClusterIP
+  selector:
+    app: rmq
+  ports:
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+    - name: management
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
