@@ -18,7 +18,7 @@ func (rh *RequestHandler) RenderView(w http.ResponseWriter, r *http.Request, rou
 
 	// 3. Render the Layout using the context that now contains the children
 	// This allows the { children... } block in your templ file to find 'view'
-	err := views.Layout(routeData.Path, routeData.StyleSheet).Render(ctxWithChildren, w)
+	err := views.Index(routeData.Path, routeData.StyleSheet).Render(ctxWithChildren, w)
 	rh.onError(w, r, err, "Internal server error", http.StatusInternalServerError)
 }
 
