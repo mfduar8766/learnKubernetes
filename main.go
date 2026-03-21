@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/mfduar8766/learnKubernetes/handlers"
-	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/rmq"
@@ -36,14 +35,14 @@ type AppDeps struct {
 func NewAppDeps(ctx context.Context) func() *AppDeps {
 	return sync.OnceValue(func() *AppDeps {
 		log := logger.NewLogger(types.APP_GATE_WAY)
-		redisClient := redisDb.ConnectToRedis(ctx, log)
+		// redisClient := redisDb.ConnectToRedis(ctx, log)
 		broker := rmq.NewRmq(ctx, log, types.APP_GATE_WAY)
 		srv := httpServer.NewServer(ctx, log, 3000)
 		handler := handlers.NewHandler(srv.GetCtx(), broker, log)
 		handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.POSTS_EX, rmq.POSTS_QUEUE, rmq.Events))
 		appDeps := AppDeps{
-			Server:  srv,
-			Redis:   redisClient,
+			Server: srv,
+			// Redis:   redisClient,
 			Handler: handler,
 			Broker:  broker,
 			Log:     log,
@@ -224,9 +223,9 @@ func main() {
 
 	app.Log.LogInfof("Main::main()::Closing database connections...")
 
-	if err = app.Redis.Close(); err != nil {
-		app.Log.LogErrorf("Main::main()::Failed to disconnect from redis: %+v", err)
-	}
+	// if err = app.Redis.Close(); err != nil {
+	// 	app.Log.LogErrorf("Main::main()::Failed to disconnect from redis: %+v", err)
+	// }
 }
 
 // kubectl exec gateway-deployment-5cd7bc7fb4-8ndrz -- curl -I http://localhost:3000/public/css/style.css

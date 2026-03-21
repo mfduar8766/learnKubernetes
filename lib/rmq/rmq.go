@@ -3,6 +3,7 @@ package rmq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -28,10 +29,10 @@ func NewRmq(ctx context.Context, log *logger.Logger, appId string) *RMQ {
 	}
 	log.LogInfof("RMQ::NewRmq():: connected to: %s", rmqURL)
 	connection, err := amqp.Dial(rmqURL)
-	utils.HandleError(err, "NewRmq()", "Error connecting...", log)
+	utils.MustHandleError("NewRmq()", "Error connecting...", err, log)
 
 	channel, err := connection.Channel()
-	utils.HandleError(err, "NewRmq()", "Error creating channel...", log)
+	utils.MustHandleError("NewRmq()", "Error creating channel...", err, log)
 
 	// CRITICAL: Request confirmations from the server
 	if err := channel.Confirm(false); err != nil {
@@ -95,6 +96,7 @@ func (r *RMQ) Publish(topic string, message []byte) {
 			ContentType:   types.APPLICATION_JSON,
 			Body:          message,
 			AppId:         r.appID,
+			Expiration:    MSG_EXPIREY_TIME,
 		}
 
 		err := r.Channel.PublishWithContext(r.Ctx, topicData.exchangeName, routingKey, false, false, publish)
@@ -149,7 +151,7 @@ func (r *RMQ) Subscribe(topic string) {
 	}
 }
 
-func (r *RMQ) PubSub(topic string, message []byte) (*RmqPubSubResponse, error) {
+func (r *RMQ) PubSub(ctx context.Context, topic string, message []byte) (*RmqPubSubResponse, error) {
 	r.mutx.pubSubMutex.Lock()
 	topicData, exists := r.subscribers[topic]
 	r.mutx.pubSubMutex.Unlock()
@@ -158,57 +160,71 @@ func (r *RMQ) PubSub(topic string, message []byte) (*RmqPubSubResponse, error) {
 		return nil, fmt.Errorf("topic %s does not exist", topic)
 	}
 
-	// Create private callback queue
-	q, err := r.Channel.QueueDeclare("", false, true, true, false, nil)
+	// 1. Create an exclusive, auto-delete, temporary queue for the response
+	q, err := r.Channel.QueueDeclare(
+		"",    // name (empty means server generates one)
+		false, // durable
+		true,  // delete when unused
+		true,  // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to declare reply queue: %w", err)
 	}
 
-	msgs, err := r.Channel.Consume(q.Name, "", true, false, false, false, nil)
+	// 2. Start consuming from the reply queue
+	msgs, err := r.Channel.Consume(
+		q.Name,
+		"",    // consumer tag
+		true,  // auto-ack
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to consume from reply queue: %w", err)
 	}
 
 	correlationID := uuid.New().String()
-
-	// USE DOT SEPARATOR
 	routingKey := fmt.Sprintf("%s.%s", topicData.topic, correlationID)
 
 	publish := amqp.Publishing{
 		MessageId:     uuid.New().String(),
-		DeliveryMode:  amqp.Persistent,
+		DeliveryMode:  amqp.Transient, // RPC responses don't usually need to be persistent
 		Timestamp:     time.Now().UTC(),
 		CorrelationId: correlationID,
 		ReplyTo:       q.Name,
 		ContentType:   types.APPLICATION_JSON,
 		Body:          message,
 		AppId:         r.appID,
+		Expiration:    MSG_EXPIREY_TIME,
 	}
 
-	pubCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	err = r.Channel.PublishWithContext(pubCtx, topicData.exchangeName, routingKey, false, false, publish)
+	// 3. Publish using the passed-in context routingKey is whats used for matchinh consumer/producwr
+	err = r.Channel.PublishWithContext(ctx, topicData.exchangeName, routingKey, false, false, publish)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to publish: %w", err)
 	}
 
-	responseChan := make(chan *RmqPubSubResponse, 1)
-	go func() {
-		for d := range msgs {
-			if d.CorrelationId == correlationID {
-				responseChan <- &RmqPubSubResponse{Service: d.AppId, Payload: d.Body}
-				return
-			}
-		}
-	}()
+	//
 
-	select {
-	case res := <-responseChan:
-		r.log.LogInfof("PubSub Success for ID: %s", correlationID)
-		return res, nil
-	case <-time.After(2 * time.Second): // Increased to 2s for testing
-		return nil, fmt.Errorf("request timed out: no response from service")
+	// 4. Wait for response or context cancellation
+	for {
+		select {
+		case d, ok := <-msgs:
+			if !ok {
+				return nil, errors.New("response channel closed")
+			}
+			if d.CorrelationId == correlationID {
+				r.log.LogInfof("PubSub Success for ID: %s", correlationID)
+				return &RmqPubSubResponse{Service: d.AppId, Payload: d.Body}, nil
+			}
+		case <-ctx.Done():
+			// If the HTTP request times out, we exit immediately
+			return nil, ctx.Err()
+		}
 	}
 }
 
@@ -276,11 +292,6 @@ func (r *RMQ) Consume(topic string) {
 }
 
 func (r *RMQ) Listen(topic string, handler func(*models.MessagePayload) ([]byte, error)) {
-	if r.Channel == nil || r.Channel.IsClosed() {
-		r.log.LogErrorf("RMQ::Listen()::failed - Channel is not open")
-		return
-	}
-
 	topicData, exists := r.subscribers[topic]
 	if !exists {
 		r.log.LogErrorf("Cannot listen to non-existent topic: %s", topic)
@@ -289,68 +300,85 @@ func (r *RMQ) Listen(topic string, handler func(*models.MessagePayload) ([]byte,
 
 	msgs, err := r.Channel.Consume(
 		topicData.queueName,
-		fmt.Sprintf("%s-worker-%s", r.appID, uuid.New().String()[:8]), // Unique tag
-		false,
+		fmt.Sprintf("%s-worker-%s", r.appID, uuid.New().String()[:8]),
+		false, // Manual Ack
 		false,
 		false,
 		false,
 		nil,
 	)
-
 	if err != nil {
-		r.log.LogErrorf("RMQ::Listen()::received error: %s", err)
+		r.log.LogErrorf("RMQ::Listen() Error: %s", err)
 		return
 	}
 
 	go func() {
-		for d := range msgs {
-			fmt.Printf("DDDDDD: %+v\n", d)
-			// 1. Unmarshal
-			var req models.MessagePayload
-			if err := json.Unmarshal(d.Body, &req); err != nil {
-				r.log.LogErrorf("Bad message format: %s", err)
-				d.Nack(false, false) // Requeue: false (drop bad JSON)
-				continue
-			}
+		for {
+			select {
+			case <-r.Ctx.Done():
+				return
+			case d, ok := <-msgs:
+				if !ok {
+					return
+				}
 
-			// 2. Run the Handler
-			responseBytes, err := handler(&req)
-			if err != nil {
-				r.log.LogErrorf("Handler error: %s", err)
-				// If DB is down, we might want to requeue: true
-				d.Nack(false, true)
-				continue // DO NOT RETURN; stay in the loop!
-			}
+				var req models.MessagePayload
+				if err := json.Unmarshal(d.Body, &req); err != nil {
+					r.log.LogErrorf("Bad JSON: %s", err)
+					d.Nack(false, false) // Drop bad message
+					continue
+				}
 
-			// 3. Send the response back
-			if d.ReplyTo != "" {
-				err := r.Channel.PublishWithContext(context.Background(),
-					"",
-					d.ReplyTo,
-					false,
-					false,
-					amqp.Publishing{
-						ContentType:   types.APPLICATION_JSON,
-						CorrelationId: d.CorrelationId,
-						Body:          responseBytes,
-						AppId:         r.appID,
-						Timestamp:     time.Now().UTC(),
-						ReplyTo:       d.ReplyTo,
-					},
-				)
+				// Execute logic
+				responseBytes, err := handler(&req)
+
+				if d.ReplyTo != "" {
+					// Send response back to Gateway
+					pubErr := r.Channel.PublishWithContext(r.Ctx,
+						"",        // Default Exchange
+						d.ReplyTo, // Direct to the callback queue
+						false,
+						false,
+						amqp.Publishing{
+							ContentType:   types.APPLICATION_JSON,
+							CorrelationId: d.CorrelationId,
+							Body:          responseBytes,
+							Timestamp:     time.Now().UTC(),
+							AppId:         r.appID,
+						},
+					)
+					if pubErr != nil {
+						r.log.LogWarnf("Could not reply (Gateway likely timed out): %v", pubErr)
+					}
+				}
+
+				// If handler failed, Nack so another worker can try.
+				// If succeeded, Ack.
 				if err != nil {
-					r.log.LogErrorf("Failed to publish reply: %s", err)
+					d.Nack(false, true)
+				} else {
+					d.Ack(false)
 				}
 			}
-
-			// 4. Finalize
-			d.Ack(false)
 		}
 	}()
 }
 
 func (r *RMQ) ClearSubscriptions() {
-	r.subscribers = nil
+	r.mutx.subscribeMutex.Lock()
+	defer r.mutx.subscribeMutex.Unlock()
+	r.subscribers = make(map[string]subscriber)
+}
+
+func (r *RMQ) Close() error {
+	r.ClearSubscriptions()
+	if r.Channel != nil {
+		r.Channel.Close()
+	}
+	if r.Connection != nil {
+		return r.Connection.Close()
+	}
+	return nil
 }
 
 // func (r *RMQ) handlePublish(topic string, requestPayload *models.MessagePayload, response []byte) {

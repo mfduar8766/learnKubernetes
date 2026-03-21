@@ -203,37 +203,21 @@ func (l *Logger) setLoggerData(level string, payload *LoggerPayload) {
 	}
 }
 
-func (l Logger) writeToFile() {
-	select {
-	case <-l.terminateChan:
-		defer l.file.Close()
-		data, err := json.Marshal(l.loggerMessage)
-		if err != nil {
-			l.file.Close()
-			panic(error)
-		}
-		fmt.Println(string(data))
-		_, err = l.file.Write(data)
-		if err != nil {
-			l.file.Close()
-			panic(err.Error())
-		}
-	default:
-		data, err := json.Marshal(l.loggerMessage)
-		if err != nil {
-			l.file.Close()
-			panic(error)
-		}
-		fmt.Println(string(data))
-		_, err = l.file.Write(data)
-		if err != nil {
-			l.file.Close()
-			panic(err.Error())
-		}
-		l.loggerMessage.Time = getDate()
-		l.loggerMessage.FileName = ""
-		l.loggerMessage.Method = ""
-		l.loggerMessage.Value = nil
-		l.loggerMessage.Message = ""
+func (l *Logger) writeToFile() {
+	data, err := json.Marshal(l.loggerMessage)
+	if err != nil {
+		fmt.Printf("Error marshalling log: %v\n", err)
+		return
 	}
+
+	// Print to console and file
+	fmt.Println(string(data))
+	if l.file != nil {
+		l.file.Write(append(data, '\n')) // Add newline for readability in the file
+	}
+
+	l.loggerMessage.Value = nil
+	l.loggerMessage.Message = ""
+	l.loggerMessage.FileName = ""
+	l.loggerMessage.Method = ""
 }

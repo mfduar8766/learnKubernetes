@@ -50,7 +50,7 @@ func rateLimitter(wg *sync.WaitGroup) {
 	fmt.Println("All requests processed.")
 }
 
-func RequestValidation(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *http.Request) error {
+func RequestValidation(ctx ICtx, log logger.ILogger, w http.ResponseWriter, r *http.Request) error {
 	// var user User
 	// Use json.NewDecoder to decode the body into the struct
 	// err := json.NewDecoder(r.Body).Decode(&user)
@@ -64,7 +64,7 @@ func RequestValidation(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *h
 	return nil
 }
 
-func Auth(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *http.Request) error {
+func Auth(ctx ICtx, log logger.ILogger, w http.ResponseWriter, r *http.Request) error {
 	tokenHeader := r.Header.Get(types.HEADER_TOKEN)
 	if len(tokenHeader) == 0 {
 		return fmt.Errorf("token is empty")

@@ -12,11 +12,11 @@ import (
 )
 
 type Users struct {
-	broker *rmq.RMQ
-	log    *logger.Logger
+	broker rmq.IRabbitMq
+	log    logger.ILogger
 }
 
-func NewUsers(broker *rmq.RMQ, log *logger.Logger) *Users {
+func NewUsers(broker rmq.IRabbitMq, log logger.ILogger) *Users {
 	return &Users{
 		broker: broker,
 		log:    log,
