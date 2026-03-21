@@ -1,3 +1,8 @@
+Structure:
+    Node (VM):
+        Pod:
+            Contaienr
+
 What is k8s:
     Container orchistration framework that manages containers (Docker)
     Managed in physical, virutal, or cloud envs
@@ -22,6 +27,8 @@ Architecture:
     Worker Nodes:
         Have kubelet process running on each node that allows clusters to communicate with each other.
         Where the applications are running like docker containers.
+    Cluster:
+        Combination of all nodes
 ======================================================================================================================================================================
 
 Components:
@@ -75,6 +82,47 @@ Config File: Has 3 parts to a config file.
     3. Status: Automatically managed by k8s
 ======================================================================================================================================================================
 
+Resource Quota: Limits the amount of memory a container can use in a pod. You need to apply a config to do this in your cluster.
+    Then use <kubectl top nodes> <kubectl top pods -A> to get the metrics for the cluster.
+    Example:
+        Here Pod1 has req: 100 limit: 200. Currently used request is 100/400 and currently used limit is 200/500
+        After adding another pod smae specs request currently used is 200/400 and limit is 400/500
+        NameSpace:
+            Pod1:
+                request: 100mb
+                limit: 200mb
+            Resource Quota:
+                requests.memory: 400mb Can only use this much of memory
+                    currently used: 100mb
+                limits.request: 500mb
+                    currently used: 200mb
+            Pod1:
+                request: 100mb
+                limit: 200mb
+            Resource Quota:
+                requests.memory: 400mb Can only use this much of memory
+                    currently used: 200mb
+                limits.request: 500mb
+                    currently used: 400mb
+    Requests:
+        Guaranteeing your Pods containers have a certain amount of resources. 
+        The containers NEED AT LEAST this amount of resources or they will starve.
+    Limits:
+        This is the maximum your pods container can consume before its killed off
+    Containers:
+        You can specify resource limit on containers
+            Example:
+                containers:
+                - name: foo
+                    image: bar
+                    resources:
+                    requests:
+                        cpu: 250m -> 250 millacore of cpu usage
+                        memory: "65M" -> 65MG
+                    limits:
+                        cpu: 500m -> MUST BE AT LEAST SAME AS requests
+                        memory: "130M"
+======================================================================================================================================================================
 Probes:
 Liveness vs. Readiness (The Big Distinction)
 This is where most people get tripped up. Think of it like a restaurant:
@@ -85,10 +133,11 @@ This is where most people get tripped up. Think of it like a restaurant:
     Parameters:
         1. initialDelaySeconds: How long to wait after the container starts before checking.
         2. periodSeconds: How often to perform the check.
-        3. failureThreshold: How many times to fail before K8s gives up and takes action (restarting or removing from service).
+        3. failureThreshold: How many consecutive failures before K8s gives up and kill the container.
         4. successThreshol: Only needs 1 success to be put back in rotation.
             Liveness: MUST ONLY BE 1
             Readiness: Can be greater than 1
+        5. timeotSeconds: How long we give the container to respond
     Liveness Probe: Checks if the container is still running. If this fails, K8s restarts the container.
     Readiness Probe: Checks if the container is ready to accept traffic.
         If this fails, the Pod is removed from the Service's load balancer so users don't hit an error page.
@@ -147,7 +196,7 @@ SHOULD NOT USE FOR SMALLER PROJECTS
             NameSpace A && B need to have independent configMaps/secret to reference the DB.
     NameSpaces CAN SHARE services
     Some components are NOT nameSpace specific they are global:
-        Volumes/persistant Volumes
+        Volumes/persistent Volumes
     When to use NameSpaces:
         1. When theres to many resources example to many services/deployments/replicas/configMaps
             Can have a Db nameSpace or a Monitoring nameSpace for prometheus graphana etc.
@@ -183,17 +232,98 @@ The "Traffic Map"
     Minikube Tunnel receives that on Port 80 and hands it to the Ingress Controller.
     Ingress Controller looks at your YAML and says: "Aha! This goes to ui-service on Port 3000."
     ui-service receives it on 3000 and sends it to your Container on 3000.
+======================================================================================================================================================================
 
-root:
-    /api
-        /users
-            main.go -> This is another service
-            Dockerfile
-    /k8s
-    /handlers
-    /lib
-    /views
-    main.go
-    go,mod
-    start.sh
-    Dockerfile
+Helm: Package manager for k8s. Its also a template engine.
+Structure:
+    myChart/
+        chart.yaml -> Contains metadata about the chart
+        values.yaml -> Contains all the values for the templates. These default values can be changed
+        charts/ -> Holds dependencies that this chart depends on
+        templates/ -> Where template files are stored
+        ...
+    So you would use helm install <CHART_NAME> to deploy
+Release Management:
+    Helm V2: Installation comes in 2 parts
+        Helm Client (CLI)
+        Server (Tiller)
+        When you run helm install myChart helm sends the files to Tiller and Tiller 
+        executes the request and creates components from the YAML files in the cluster.
+        When you create/change deployment Tiller will store a copy of that config for future reference.
+        Example:
+            Changes will be applied to existing deployment instead of removing it and making a new one
+            If it fails you can roll back that upgrade (hrlm rollback <CHART_NAME>)
+            1. installed chart (helm install <CHART_NAME>)
+            2. upgrade to version 1.0.0 (helm upgrade <CHART_NAME>)
+    Helm V3: No Tiller only helm binary executable
+======================================================================================================================================================================
+
+Container Communication Inside Pod (Networking):
+    Pod Fundamental Process: 
+        Each pod has its own IP. This IP is reacheable fron all other pods in the cluster.
+        Has at least 1 container and its own unique IP.
+        When a Pod is created on a Node it gets its own NameSpace and its own virtual ethernet connection.
+        So a Pod is a virtual host like your PC. Both have IPs and a range of ports to allocate to its containers.
+    Container Port Mapping without Pods: How to allocate pors without conflicts
+        Example: PostgreSQL container running of port 5432. When you start a container directly in your machine
+        you bind your host port to that container port. (<HOST_PORT:CONTAINER_PORT>) 
+        So (5000:5432) 5432 gets mapped to host 5000.
+    Multiple Containers 1 Pod:
+        Since the Pod is a virtual host containers can talk to each other over 127.0.0.1:<PORT>
+        Each container gets a Pause Container (Sandbox Contaienr): Used to reserves and holds network namespace
+            Thats shared by all containers in a pod. If a container dies Pause stays alive. 
+            If Pod gets deleted Pause is gone.
+======================================================================================================================================================================
+
+Volumes:
+    MOUNT PATHS OVERRIDE EXISTING DIRECTORIES IN A CONTAINER
+    Is a directory with some data
+    K8S does not give data persistence out of the box. Must be configured for each app.
+    Pods access storage by using PVC as a Volume.
+        Pod->PVC->finds a volume in cluster that satisfies the PVC->volume creates the storage resource.
+        Volume is than mounted into the pod and than mounted into the container inside the pod.
+    Requirements:
+        1. Storage should not depend on pod lifecycle. Pod depends on storage.
+        2. Storage must be available on all nodes.
+        3. Storage needs to survive even if cluster crashes.
+    Persistent Volume:
+        It is not nameSpace specific.
+        You decide what type of storage your cluster needs.
+        A cluster resource like RAM/CPU that is used to store data. 
+        It uses the local hardrive (from cluster nodes), cloud storage, nsf server.
+    Persistent Volume Claim: (PVC):
+        Claims a Volume with certain capacity. Must exist in same namespace as pod using the Claim
+    Volume Types (Local/Remote/ConfigMap/Secret):
+        Local: Violates 2nd/3rd rule of persistence for databases
+        Remote:
+        ConfigMap: Local volume not created via pv && PVC managed by k8s
+        Secret: Local volume not created via pv && PVC managed by k8s
+    Storage Class:
+        Creates/provisions PV dynamically when PVC claims it.
+        Abstraction level that abstracts the storage provider and its parameters. It is claimed by the PVC.
+        Pod -> claims storage via PVC -> PVC requests storage from Storage Class -> Storage Class creates PV (Persistent Volume)
+    Example:
+        containers:
+        - name: mongodb
+          image: mongo:latest
+          ports:
+            - containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongo-secret
+            - configMapRef:
+                name: mongo-config
+          volumeMounts:
+            - name: init-data-volume
+              mountPath: /data/init # Where the JSON file sits THIS WILL OVERRIDE EXISTING DIRS IN A CONTAINER SO IT MUST BE UNIQUE
+            - name: mongo-storage # Where the actual DB lives
+              mountPath: /data/db/file.txt > This saves the file to the /data/db dir instead of overriding the whiole dir
+              subPath: file.txt > SUB_PATH
+                For example lets say mountPath is /data/db/file.txt. We use subPath to write a subPath to just the file.txt 
+      volumes:
+        - name: init-data-volume
+          configMap:
+            name: mongo-init-data # The JSON from ./start.sh script
+        - name: mongo-storage
+          persistentVolumeClaim:
+            claimName: mongo-pvc # The persistent storage

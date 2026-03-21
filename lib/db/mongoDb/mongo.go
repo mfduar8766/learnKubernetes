@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
+	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -13,10 +14,12 @@ import (
 func ConnectToMongo(ctx context.Context, log *logger.Logger) (*mongo.Client, error) {
 	defaultHost := "mongo-service:27017"
 
-	user := os.Getenv("MONGO_INITDB_ROOT_USERNAME")
-	pass := os.Getenv("MONGO_INITDB_ROOT_PASSWORD")
-	host := os.Getenv("MONGO_HOST")
+	user := os.Getenv(types.MONGO_INITDB_ROOT_USERNAME)
+	pass := os.Getenv(types.MONGO_INITDB_ROOT_PASSWORD)
+	host := os.Getenv(types.MONGO_HOST)
+	currentEnv := os.Getenv(types.CURRENT_ENV)
 
+	//TODO: FIX THIS AS ITS WRONG DEFAULT HOST IS NOT mongo-service:27017
 	if host == "" || user == "" || pass == "" {
 		log.LogWarnf("Mongo::ConnectToMongo()::Mongo env vars missing, using defaultHost: %s", defaultHost)
 		if host == "" {
@@ -31,6 +34,10 @@ func ConnectToMongo(ctx context.Context, log *logger.Logger) (*mongo.Client, err
 	}
 
 	mongoDSN := fmt.Sprintf("mongodb://%s:%s@%s", user, pass, host)
+
+	if currentEnv != types.PROD_ENV {
+		mongoDSN = "mongodb://user:password@127.0.0.1:27017/?authSource=admin"
+	}
 
 	log.LogInfof("Mongo::ConnectToMongo()::Attempting Mongo connection: mongodb://%s:****@%s", user, host)
 

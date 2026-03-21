@@ -44,7 +44,7 @@ func JsonUnMarshall(data []byte, payload any) error {
 }
 
 func GetDate() string {
-	return time.Now().Local().UTC().Format("2006-01-02:15:04:05.000")
+	return time.Now().UTC().Format("2006-01-02:15:04:05.000")
 }
 
 func BuildHttpError(err error, message, agent, host string) map[string]any {

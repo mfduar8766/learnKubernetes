@@ -16,7 +16,7 @@ type Posts struct {
 
 type ResponsePayloadParams struct {
 	Result types.ResponsePayloadResults `json:"result"`
-	Data   any
+	Data   any                          `json:"data"`
 }
 
 type MessagePayload struct {
@@ -24,14 +24,16 @@ type MessagePayload struct {
 	*Params  `json:"params,omitempty"`
 	Response *ResponsePayloadParams `json:"response,omitempty"`
 	Error    map[string]any         `json:"error,omitempty"`
+	Topic    string                 `json:"topic"`
 }
 
-func CreateNewMessagePayload(event events.UserEvents, params *Params, response *ResponsePayloadParams, errorMessage map[string]interface{}) *MessagePayload {
+func CreateNewMessagePayload(topic string, event events.UserEvents, params *Params, response *ResponsePayloadParams, errorMessage map[string]interface{}) *MessagePayload {
 	return &MessagePayload{
 		Event:    events.UserEventsType(event),
 		Params:   params,
 		Response: response,
 		Error:    errorMessage,
+		Topic:    topic,
 	}
 }
 

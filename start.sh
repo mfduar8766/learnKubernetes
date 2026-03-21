@@ -78,11 +78,14 @@ MONGO_POD=$($K8S_CMD get pods -l app=mongo -o jsonpath='{.items[0].metadata.name
 # Run the import directly
 # Note the SINGLE QUOTES around the sh -c command. 
 # This ensures the variables are evaluated INSIDE the container.
-$K8S_CMD exec $MONGO_POD -- /bin/sh -c 'mongoimport --host localhost \
-  --username user \
-  --password password \
+echo "Populate Db..."
+$K8S_CMD exec $MONGO_POD -- /bin/sh -c "mongoimport --host localhost \
+  --username \$MONGO_INITDB_ROOT_USERNAME \
+  --password \$MONGO_INITDB_ROOT_PASSWORD \
   --authenticationDatabase admin \
-  --db test --collection users --type json --file /data/init/initDb.json --jsonArray --upsert'
+  --db test --collection users --type json \
+  --file /data/init/initDb.json --jsonArray \
+  --upsert --upsertFields firstName"
 
 echo "🚀 Deleting Deployments..."
 $K8S_CMD delete deployment gateway-deployment users-deployment ui-deployment --ignore-not-found
@@ -172,3 +175,6 @@ echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx deployment/i
 # 6. Open Service
 # echo "🌐 Opening browser..."
 # minikube service ui-service
+
+
+#kubectl port-forward deployment/mongo-deployment 27017:27017

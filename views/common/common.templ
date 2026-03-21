@@ -1,34 +1,28 @@
-package views
+package common
 
-import "github.com/mfduar8766/learnKubernetes/views/common"
-
-templ Layout(route, styleSheetPath string) {
-	<!DOCTYPE html>
-	<html lang="en" style="height: 100%; width: 100%">
-		@common.Header(route, styleSheetPath)
-		<body class="container flex flex-col justify-center mx-auto h-full w-full">
-			<div
-				id="base-element"
-				class="container mx-auto h-screen w-screen flex justify-center align-center"
-			>
-				<main id="app">
-					{ children... }
-				</main>
-			</div>
-		</body>
-		<script src="/public/index.js"></script>
-	</html>
+templ Header(route, styleSheetPath string) {
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		// <script src="https://unpkg.com"></script>
+		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+		<link rel="stylesheet" href={ styleSheetPath }/>
+		if route == "/" {
+			<title>App</title>
+		}
+	</head>
 }
 
-templ Home() {
-	<div>HOME PAGE</div>
+templ Button(buttonType, text string) {
+	<button
+		class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline mb-1"
+		type={ buttonType }
+	>
+		{ text }
+	</button>
 }
 
-templ PageNotFound() {
-	<div>404 Page Not Found</div>
-}
-
-templ SignIn() {
+templ Form() {
 	<div class="container w-full h-full">
 		<form
 			class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4"
