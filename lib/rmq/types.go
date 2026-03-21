@@ -10,12 +10,14 @@ import (
 )
 
 type IRabbitMq interface {
-	NewRmq(ctx context.Context, log *logger.Logger, appId string) *RMQ
-	Consume(topic string, isPublish bool, response []byte) *models.MessagePayload
+	BuildTopic(exchange string, queue string, topicType TopicTypes) string
 	Subscribe(topic string)
 	Publish(topic string, message []byte)
-	PubSub(topic string, message []byte) (*models.MessagePayload, error)
+	PubSub(ctx context.Context, topic string, message []byte) (*RmqPubSubResponse, error)
+	Consume(topic string)
+	Listen(topic string, handler func(*models.MessagePayload) ([]byte, error))
 	ClearSubscriptions()
+	Close() error
 }
 
 type TopicTypes string
@@ -46,6 +48,8 @@ const (
 	TOPIC   = amqp.ExchangeTopic
 	HEADERS = amqp.ExchangeHeaders
 )
+
+const MSG_EXPIREY_TIME = "1000"
 
 type RMQ struct {
 	log            *logger.Logger

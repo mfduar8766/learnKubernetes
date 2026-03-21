@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -31,21 +30,21 @@ type RoutData struct {
 }
 
 type RequestHandler struct {
-	logger        *logger.Logger
-	Broker        *rmq.RMQ
-	QueueNames    map[string]string
-	ExchangeNames map[string]string
-	ctx           *httpServer.Ctx
+	logger        logger.ILogger
+	broker        rmq.IRabbitMq
+	queueNames    map[string]string
+	exchangeNames map[string]string
+	ctx           httpServer.ICtx
 	subScribeLock *sync.Mutex
 	routes        map[string]*RoutData
 }
 
-func NewHandler(ctx *httpServer.Ctx, broker *rmq.RMQ, log *logger.Logger) *RequestHandler {
+func NewHandler(ctx httpServer.ICtx, broker rmq.IRabbitMq, log logger.ILogger) *RequestHandler {
 	return &RequestHandler{
 		ctx:           ctx,
-		Broker:        broker,
-		QueueNames:    map[string]string{rmq.USERS_QUEUE: rmq.USERS_QUEUE, rmq.POSTS_QUEUE: rmq.POSTS_QUEUE},
-		ExchangeNames: map[string]string{rmq.USERS_EX: rmq.USERS_EX, rmq.POSTS_EX: rmq.POSTS_EX},
+		broker:        broker,
+		queueNames:    map[string]string{rmq.USERS_QUEUE: rmq.USERS_QUEUE, rmq.POSTS_QUEUE: rmq.POSTS_QUEUE},
+		exchangeNames: map[string]string{rmq.USERS_EX: rmq.USERS_EX, rmq.POSTS_EX: rmq.POSTS_EX},
 		logger:        log,
 		subScribeLock: &sync.Mutex{},
 		routes: map[string]*RoutData{
@@ -86,11 +85,9 @@ func (rh *RequestHandler) getUsers(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 1000*time.Millisecond)
 	defer cancel()
 
-	var responseChan chan *rmq.RmqPubSubResponse = make(chan *rmq.RmqPubSubResponse, 1)
-	topic := rh.Broker.BuildTopic(rh.ExchangeNames[rmq.USERS_EX], rh.QueueNames[rmq.USERS_QUEUE], rmq.Request)
-
+	topic := rh.broker.BuildTopic(rh.exchangeNames[rmq.USERS_EX], rh.queueNames[rmq.USERS_QUEUE], rmq.Request)
 	request := models.CreateNewMessagePayload(topic, events.UserEvents(events.GET_USERS), &models.Params{}, nil, nil)
-	requstBytes, err := request.Marshall()
+	requestBytes, err := request.Marshall()
 	if err != nil {
 		rh.logger.LogError(&logger.LoggerPayload{
 			Message: "Error marshalling message payload",
@@ -101,50 +98,20 @@ func (rh *RequestHandler) getUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func() {
-		res, err := rh.Broker.PubSub(topic, requstBytes)
-		if err != nil {
-			utils.HandleError(err, "GetUsers()", "cannot get users at this time", rh.logger)
-			return
-		}
-		responseChan <- res
-		close(responseChan)
-	}()
-
-	select {
-	case <-ctx.Done():
+	// Call PubSub synchronously (the context handles the wait/timeout)
+	response, err := rh.broker.PubSub(ctx, topic, requestBytes)
+	if err != nil {
 		w.WriteHeader(http.StatusGatewayTimeout)
-		request.Error = utils.BuildHttpError(errors.New("failed to get users"), "request timedout", r.UserAgent(), r.Host)
+		request.Error = utils.BuildHttpError(err, "request timedout", r.UserAgent(), r.Host)
 		errorBytes, err := request.Marshall()
 		utils.HandleError(err, "GetUsers()", "request timedout. Failed to get response from users service...", rh.logger)
 		w.Write(errorBytes)
 		return
-	case response := <-responseChan:
-		w.Header().Set(types.CONTENT_TYPE, types.APPLICATION_JSON)
-		rh.logger.LogInfo(&logger.LoggerPayload{
-			Message:  "Received getUsers",
-			Method:   "GetUsers()",
-			FileName: "handlers.go",
-		})
-		if response.Payload == nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			request.Error = utils.BuildHttpError(nil, "no users found", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "cannot get users at this time", rh.logger)
-			w.Write(errorBytes)
-		}
-		w.WriteHeader(http.StatusOK)
-		rh.logger.LogInfo(&logger.LoggerPayload{
-			Message: "Received response from service:",
-			Value: map[string]string{
-				"service": response.Service,
-				"payload": string(response.Payload),
-			},
-			Method:   "GetUsers()",
-			FileName: "handlers.go",
-		})
-		w.Write(response.Payload)
 	}
+
+	w.Header().Set(types.CONTENT_TYPE, types.APPLICATION_JSON)
+	w.WriteHeader(http.StatusOK)
+	w.Write(response.Payload)
 }
 
 func (rh *RequestHandler) getPosts(w http.ResponseWriter, _ *http.Request) {
@@ -177,12 +144,12 @@ func (rh *RequestHandler) getPosts(w http.ResponseWriter, _ *http.Request) {
 
 func (rh *RequestHandler) Subscribe(topics ...string) {
 	for _, topic := range topics {
-		rh.Broker.Subscribe(topic)
+		rh.broker.Subscribe(topic)
 	}
 }
 
 func (rh *RequestHandler) ClearSubscriptions() {
-	rh.Broker.ClearSubscriptions()
+	rh.broker.ClearSubscriptions()
 }
 
 /*

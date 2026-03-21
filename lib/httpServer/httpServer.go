@@ -12,7 +12,7 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 )
 
-type MiddleWareOptions func(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *http.Request) error
+type MiddleWareOptions func(ctx ICtx, log logger.ILogger, w http.ResponseWriter, r *http.Request) error
 type HttpHandler func(http.ResponseWriter, *http.Request)
 type HttpHandlerFunc map[string]func(handler HttpHandler, middleWare ...MiddleWareOptions) HttpHandler
 type Routes map[string]string
@@ -23,60 +23,54 @@ type ReturnCtx struct {
 }
 
 type Ctx struct {
-	ctx    context.Context
-	ctxMap map[string]context.Context
-	lock   *sync.Mutex
-	rLock  *sync.RWMutex
+	ctx context.Context
+	// We use any (interface{}) to avoid the "Context Chaining" memory leak
+	ctxMap map[string]any
+	lock   sync.RWMutex // No pointer needed if the struct is passed by ref
 }
 
 func NewCtx(ctx context.Context) *Ctx {
 	return &Ctx{
 		ctx:    ctx,
-		ctxMap: map[string]context.Context{},
-		lock:   &sync.Mutex{},
-		rLock:  &sync.RWMutex{},
+		ctxMap: make(map[string]any),
+		// sync.RWMutex zero-value is ready to use
 	}
 }
 
+// GetCtxValue now performs a flat O(1) lookup
 func (c *Ctx) GetCtxValue(key string) any {
-	c.rLock.RLock()
-	defer c.rLock.RUnlock()
-	if value := c.ctxMap[key]; value != nil {
-		return value.Value(key)
-	}
-	return nil
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.ctxMap[key]
 }
 
+// SetCtxValue now updates the map directly without nesting contexts
 func (c *Ctx) SetCtxValue(key string, value any) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if _, exists := c.ctxMap[key]; !exists {
-		c.ctxMap[key] = context.WithValue(c.ctx, key, value)
-		return
-	}
-	c.ctxMap[key] = context.WithValue(c.ctxMap[key], key, value)
+	c.ctxMap[key] = value
 }
 
-func (c *Ctx) WithTimeout(key string, timeOut time.Duration) (*ReturnCtx, error) {
-	if ctx, exists := c.ctxMap[key]; exists {
-		ctxTimeOut, cancel := context.WithTimeout(ctx, timeOut)
-		return &ReturnCtx{
-			Ctx:    ctxTimeOut,
-			Cancel: cancel,
-		}, nil
-	}
-	return nil, fmt.Errorf("no context found...")
+// WithTimeout derives a child context from the base request context
+func (c *Ctx) WithTimeout(timeOut time.Duration) (*ReturnCtx, error) {
+	// We don't need a lock here because c.ctx is typically read-only
+	ctxTimeOut, cancel := context.WithTimeout(c.ctx, timeOut)
+
+	return &ReturnCtx{
+		Ctx:    ctxTimeOut,
+		Cancel: cancel,
+	}, nil
 }
 
 type Server struct {
-	ctx        *Ctx
-	logger     *logger.Logger
+	ctx        ICtx
+	logger     logger.ILogger
 	server     *http.Server
 	getCtxLock *sync.RWMutex
 	mux        *http.ServeMux
 }
 
-func NewServer(ctx context.Context, logger *logger.Logger, addr int) *Server {
+func NewServer(ctx context.Context, logger logger.ILogger, addr int) *Server {
 	mux := http.NewServeMux()
 	s := Server{
 		ctx:        NewCtx(ctx),
@@ -89,7 +83,7 @@ func NewServer(ctx context.Context, logger *logger.Logger, addr int) *Server {
 	return &s
 }
 
-func (s *Server) GetCtx() *Ctx {
+func (s *Server) GetCtx() ICtx {
 	s.getCtxLock.RLock()
 	defer s.getCtxLock.RUnlock()
 	return s.ctx

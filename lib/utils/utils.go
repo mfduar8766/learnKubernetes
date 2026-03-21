@@ -7,7 +7,7 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 )
 
-func HandleError(err error, method string, message string, log *logger.Logger) {
+func HandleError(err error, method string, message string, log logger.ILogger) {
 	if err != nil {
 		log.LogError(&logger.LoggerPayload{
 			Message: message,
@@ -17,7 +17,7 @@ func HandleError(err error, method string, message string, log *logger.Logger) {
 	}
 }
 
-func MustHandleError(method, message string, err error, log *logger.Logger) {
+func MustHandleError(method, message string, err error, log logger.ILogger) {
 	if err != nil {
 		log.LogError(&logger.LoggerPayload{
 			Message: message,
