@@ -6,17 +6,20 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/events"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/models"
+	"github.com/mfduar8766/learnKubernetes/lib/rmq"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
 )
 
 type Users struct {
-	log *logger.Logger
+	broker *rmq.RMQ
+	log    *logger.Logger
 }
 
-func NewUsers(log *logger.Logger) *Users {
+func NewUsers(broker *rmq.RMQ, log *logger.Logger) *Users {
 	return &Users{
-		log: log,
+		broker: broker,
+		log:    log,
 	}
 }
 
@@ -52,7 +55,8 @@ func (u *Users) GetUsers() ([]byte, error) {
 		u.log.LogErrorf("Users::GetUsers()::received marshall error: %+v", err.Error())
 		return nil, err
 	}
-	response := models.CreateNewMessagePayload(events.UserEvents(events.GET_USERS), nil, &models.ResponsePayloadParams{
+	topic := u.broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request)
+	response := models.CreateNewMessagePayload(topic, events.UserEvents(events.GET_USERS), nil, &models.ResponsePayloadParams{
 		Result: types.ResponsePayloadResults(types.SUCCESS),
 		Data:   string(userBytes),
 	}, nil)

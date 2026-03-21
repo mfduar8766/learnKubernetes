@@ -64,10 +64,11 @@ type Logger struct {
 	loggerMessage *loggerPayload
 	file          *os.File
 	terminateChan chan bool
+	mask          []string
 }
 
 func getDate() string {
-	return time.Now().Local().UTC().Format("2006-01-02:15:04:05.000")
+	return time.Now().UTC().Format("2006-01-02:15:04:05.000")
 }
 
 func NewLogger(serviceName string) *Logger {
@@ -83,6 +84,7 @@ func NewLogger(serviceName string) *Logger {
 			Source: serviceName,
 			Time:   date,
 		},
+		mask: make([]string, 0),
 	}
 	logger.file = logger.createDir()
 	return logger
@@ -112,6 +114,11 @@ func (l *Logger) createDir() *os.File {
 		panic(err)
 	}
 	return file
+}
+
+// TODO: Implement this
+func (l *Logger) SetMasks(masks []string) {
+	l.mask = masks
 }
 
 func (l *Logger) Close() {

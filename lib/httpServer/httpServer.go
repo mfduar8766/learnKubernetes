@@ -12,7 +12,7 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 )
 
-type MiddleWareOptions func(ctx *Ctx, log *logger.Logger, headers http.Header) error
+type MiddleWareOptions func(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *http.Request) error
 type HttpHandler func(http.ResponseWriter, *http.Request)
 type HttpHandlerFunc map[string]func(handler HttpHandler, middleWare ...MiddleWareOptions) HttpHandler
 type Routes map[string]string
@@ -73,22 +73,17 @@ type Server struct {
 	logger     *logger.Logger
 	server     *http.Server
 	getCtxLock *sync.RWMutex
-	// handlers    HttpHandlerFunc
-	// routes      Routes
-	// routesLock  *sync.Mutex
-	// handlerLock *sync.Mutex
+	mux        *http.ServeMux
 }
 
 func NewServer(ctx context.Context, logger *logger.Logger, addr int) *Server {
+	mux := http.NewServeMux()
 	s := Server{
 		ctx:        NewCtx(ctx),
-		server:     &http.Server{Addr: fmt.Sprintf(":%d", addr), Handler: http.DefaultServeMux},
+		server:     &http.Server{Addr: fmt.Sprintf(":%d", addr), Handler: mux},
 		logger:     logger,
 		getCtxLock: &sync.RWMutex{},
-		// handlers:    make(HttpHandlerFunc),
-		// routes:      make(Routes),
-		// routesLock:  &sync.Mutex{},
-		// handlerLock: &sync.Mutex{},
+		mux:        mux,
 	}
 	s.ping()
 	return &s
@@ -119,7 +114,6 @@ func (s *Server) SetOptions(opts ...SetOptions) {
 
 // Takes a map[string]string where key is HttpMethod and value is endpoint
 func (s *Server) SetGlobalMiddleWare(routes Routes, handler HttpHandler, middleWare ...MiddleWareOptions) {
-
 }
 
 func (s *Server) ListenAndServe() error {
@@ -140,7 +134,7 @@ func (s *Server) Handler(handler HttpHandler, middleWare ...MiddleWareOptions) H
 	return func(w http.ResponseWriter, r *http.Request) {
 		if len(middleWare) > 0 {
 			for _, mid := range middleWare {
-				if err := mid(s.ctx, s.logger, r.Header); err != nil {
+				if err := mid(s.ctx, s.logger, w, r); err != nil {
 					s.logger.LogErrorf("Lib::Handler()::received error::%+v", err.Error())
 					w.WriteHeader(http.StatusUnauthorized)
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -154,19 +148,19 @@ func (s *Server) Handler(handler HttpHandler, middleWare ...MiddleWareOptions) H
 
 func (s *Server) Get(pattern string, handler HttpHandler, middleWare ...MiddleWareOptions) {
 	// s.logger.LogInfof("Server::Get()::received request on: %s, setting pattern: %s", pattern, fmt.Sprintf("%s %s", http.MethodGet, pattern))
-	http.HandleFunc(fmt.Sprintf("%s %s", http.MethodGet, pattern), s.Handler(handler, middleWare...))
+	s.mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodGet, pattern), s.Handler(handler, middleWare...))
 }
 
 func (s *Server) Post(pattern string, handler HttpHandler, middleWare ...MiddleWareOptions) {
-	http.HandleFunc(fmt.Sprintf("%s %s", http.MethodPost, pattern), s.Handler(handler, middleWare...))
+	s.mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodPost, pattern), s.Handler(handler, middleWare...))
 }
 
 func (s *Server) Put(pattern string, handler HttpHandler, middleWare ...MiddleWareOptions) {
-	http.HandleFunc(fmt.Sprintf("%s %s", http.MethodPut, pattern), s.Handler(handler, middleWare...))
+	s.mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodPut, pattern), s.Handler(handler, middleWare...))
 }
 
 func (s *Server) Delete(pattern string, handler HttpHandler, middleWare ...MiddleWareOptions) {
-	http.HandleFunc(fmt.Sprintf("%s %s", http.MethodDelete, pattern), s.Handler(handler, middleWare...))
+	s.mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodDelete, pattern), s.Handler(handler, middleWare...))
 }
 
 func (s *Server) ping() {

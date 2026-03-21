@@ -22,5 +22,16 @@
       "SUPER_USER"
     ],
     "createdAt": "2024-01-05 15:20:28.836738 +0000 UTC"
+  },
+  {
+    "firstName": "test",
+    "lastName": "test",
+    "email": "test@gmail.com",
+    "age": 22,
+    "password": "testPassword22!",
+    "roles": [
+      "ADMIN"
+    ],
+    "createdAt": "2024-01-05 15:20:28.836738 +0000 UTC"
   }
 ]

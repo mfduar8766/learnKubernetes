@@ -18,13 +18,8 @@ RUN go test ./...
 # RUN go install github.com/a-h/templ/cmd/templ@latest
 # RUN templ generate
 
-# 3. Build with CGO disabled for a "static" binary 
-# (This prevents 'file not found' errors in K8s)
-# RUN CGO_ENABLED=0 go build -v -o /usr/local/bin/app .
+# Build the binary into the current WORKDIR (/usr/src/app)
+RUN CGO_ENABLED=0 go build -v -o gateway-exe .
 
-# # 4. Set the binary to run
-# CMD ["/usr/local/bin/app"]
-
-RUN CGO_ENABLED=0 go build -v -o /usr/local/bin/gateway-exe .
-
-CMD ["/usr/local/bin/gateway-exe"]
+# Run from /usr/src/app so it can see the ./public folder
+CMD ["./gateway-exe"]

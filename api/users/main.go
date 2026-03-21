@@ -17,6 +17,7 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
+	"github.com/mfduar8766/learnKubernetes/lib/models"
 	"github.com/mfduar8766/learnKubernetes/lib/rmq"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
@@ -33,26 +34,28 @@ type AppDeps struct {
 	Mongo   *mongo.Client
 }
 
-func setUp(ctx context.Context) func() *AppDeps {
+func NewAppDeps(ctx context.Context) func() *AppDeps {
 	return sync.OnceValue(func() *AppDeps {
-		log := logger.NewLogger(types.APP_USERS_SERVICE)
+		log := logger.NewLogger(types.APP_GATE_WAY)
 		redisClient := redisDb.ConnectToRedis(ctx, log)
-		broker := rmq.NewRmq(ctx, log, types.APP_USERS_SERVICE)
-		srv := httpServer.NewServer(ctx, log, 3000)
-		handler := handlers.NewHandler(srv.GetCtx(), broker, log)
-		handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request))
-		mongo, err := mongoDb.ConnectToMongo(ctx, log)
+		mongoClient, err := mongoDb.ConnectToMongo(ctx, log)
 		if err != nil {
 			panic(err)
 		}
-		return &AppDeps{
+		broker := rmq.NewRmq(ctx, log, types.APP_GATE_WAY)
+		srv := httpServer.NewServer(ctx, log, 3000)
+		handler := handlers.NewHandler(srv.GetCtx(), broker, log)
+		handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.POSTS_EX, rmq.POSTS_QUEUE, rmq.Events))
+
+		appDeps := AppDeps{
 			Server:  srv,
 			Redis:   redisClient,
 			Handler: handler,
 			Broker:  broker,
 			Log:     log,
-			Mongo:   mongo,
+			Mongo:   mongoClient,
 		}
+		return &appDeps
 	})
 }
 
@@ -60,17 +63,10 @@ func main() {
 	var (
 		wg    sync.WaitGroup
 		ctx            = context.Background()
-		app   *AppDeps = setUp(ctx)()
-		users *Users   = NewUsers(app.Log)
+		app   *AppDeps = NewAppDeps(ctx)()
+		users *Users   = NewUsers(app.Broker, app.Log)
 	)
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	response, err := users.GetUsers()
-	utils.HandleError(err, "main()", "Error getting users...", app.Log)
-
-	topic := app.Broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request)
-	app.Broker.Subscribe(topic)
 
 	defer func() {
 		app.Broker.Connection.Close()
@@ -99,28 +95,37 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	wg.Go(func() {
-		brokerResponse := app.Broker.Consume(topic, true, response)
-		if brokerResponse == nil {
-			app.Log.LogErrorf("Main::main()::received empty response...")
-		}
+	app.Broker.Listen(app.Broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), func(req *models.MessagePayload) ([]byte, error) {
+		app.Log.LogInfof("Processing GetUsers request: %+v", req)
+		response, err := users.GetUsers()
+		utils.HandleError(err, "main()", "Error getting users...", app.Log)
+		return response, nil
 	})
+
 	wg.Go(func() {
-		if err = app.Server.ListenAndServe(); err != nil && err == http.ErrServerClosed {
+		if err := app.Server.ListenAndServe(); err != nil && err == http.ErrServerClosed {
 			app.Log.LogErrorf("Main::main()::ListenAndServe()::%+v", err.Error())
 			cancel()
 		}
+	})
+
+	app.Log.LogInfo(&logger.LoggerPayload{
+		Message: "Main::main()::Server is running on",
+		Value: map[string]string{
+			"host": "127.0.0.1",
+			"port": "3001",
+		},
 	})
 
 	<-ctx.Done()
 	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer shutdownCancel()
 
-	if err = app.Redis.Close(); err != nil {
+	if err := app.Redis.Close(); err != nil {
 		app.Log.LogErrorf("Main::main()::Failed to disconnect from redis: %+v", err.Error())
 	}
 
-	if err = app.Mongo.Disconnect(shutdownCtx); err != nil {
+	if err := app.Mongo.Disconnect(shutdownCtx); err != nil {
 		app.Log.LogErrorf("Main::main()::Failed to disconnect from mongo: %+v", err.Error())
 	}
 

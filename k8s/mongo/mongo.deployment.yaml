@@ -45,13 +45,13 @@ spec:
           #           --db test --collection users --type json --file /data/init/initDb.json --jsonArray --upsert
           volumeMounts:
             - name: init-data-volume
-              mountPath: /data/init # Where the JSON file sits
+              mountPath: /data/init # Where the JSON file sits THIS WILL OVERRIDE EXISTING DIRS IN A CONTAINER SO IT MUST BE UNIQUE
             - name: mongo-storage # Where the actual DB lives
               mountPath: /data/db
       volumes:
         - name: init-data-volume
           configMap:
-            name: mongo-init-data # The JSON from your script
+            name: mongo-init-data # The JSON from ./start.sh script
         - name: mongo-storage
           persistentVolumeClaim:
             claimName: mongo-pvc # The persistent storage

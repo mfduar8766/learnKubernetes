@@ -41,28 +41,8 @@ spec: # DEPLOYMENT SPEFICICATIONS
           env:
             - name: RABBITMQ_URI
               value: "amqp://$(RABBITMQ_DEFAULT_USER):$(RABBITMQ_DEFAULT_PASS)@$(RABBITMQ_HOST)"
-          # env:
-          #   - name: MONGO_INITDB_ROOT_USERNAME
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: mongo-secret
-          #         key: mongo-user
-          #   - name: MONGO_INITDB_ROOT_PASSWORD
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: mongo-secret
-          #         key: mongo-password
-          #   - name: REDIS_PASSWORD
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: redis-secret
-          #         key: redis-password
-          #   - name: DB_URL
-          #     valueFrom:
-          #       configMapKeyRef:
-          #         name: mongo-config
-          #         key: mongo-url
-
+            - name: "CURRENT_ENV"
+              value: "PROD"
           # 1. Is the app alive? (If no, restart it)
           # httpGet: Hits an endpoint. A response code between 200–399 is a "success." (STANDARD)
           # exec: Runs a command inside the container (e.g., cat /tmp/healthy). If the command returns exit code 0, it's a "success."
@@ -76,6 +56,7 @@ spec: # DEPLOYMENT SPEFICICATIONS
             failureThreshold: 3 # How many times to fail before K8s gives up and takes action (restarting or removing from service
             # 2. Is the app ready for traffic? (If no, stop sending users here)
             successThreshold: 1
+            timeoutSeconds: 1
 
           readinessProbe:
             httpGet:
@@ -85,6 +66,7 @@ spec: # DEPLOYMENT SPEFICICATIONS
             periodSeconds: 10 # Check every 5 seconds
             failureThreshold: 3 # Must fail 3 times (3*5) to be removed
             successThreshold: 1 # Only needs 1 success to be put back in rotation
+            timeoutSeconds: 1
 ---
 # # SERVICE: THIS CAN BE A SEPERATE FILE LIKE gateway.service.yaml BUT CONVENTION IS TO KEEP IT IN DEPLOYMENT.YAML
 

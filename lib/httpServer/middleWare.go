@@ -50,15 +50,22 @@ func rateLimitter(wg *sync.WaitGroup) {
 	fmt.Println("All requests processed.")
 }
 
-func RequestValidation(ctx *Ctx, log *logger.Logger, headers http.Header) error {
+func RequestValidation(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *http.Request) error {
+	// var user User
+	// Use json.NewDecoder to decode the body into the struct
+	// err := json.NewDecoder(r.Body).Decode(&user)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusBadRequest)
+	// 	return nil
+	// }
+
+	// Remember to close the request body
+	// defer r.Body.Close()
 	return nil
 }
 
-func Auth(ctx *Ctx, log *logger.Logger, headers http.Header) error {
-	if headers == nil {
-		return fmt.Errorf("args cannot be nil")
-	}
-	tokenHeader := headers.Get(types.HEADER_TOKEN)
+func Auth(ctx *Ctx, log *logger.Logger, w http.ResponseWriter, r *http.Request) error {
+	tokenHeader := r.Header.Get(types.HEADER_TOKEN)
 	if len(tokenHeader) == 0 {
 		return fmt.Errorf("token is empty")
 	} else {

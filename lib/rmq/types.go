@@ -23,17 +23,19 @@ type TopicTypes string
 const (
 	Request  TopicTypes = "request"
 	Response TopicTypes = "response"
-	Event    TopicTypes = "event"
+	Events   TopicTypes = "events"
 )
 
 // Queues
 const (
 	USERS_QUEUE = "users_queue"
+	POSTS_QUEUE = "posts_queue"
 )
 
 // Exchanges
 const (
-	USERS_EX = "users"
+	USERS_EX = "users_ex"
+	POSTS_EX = "posts_ex"
 )
 
 // Exchanges
@@ -56,7 +58,7 @@ type RMQ struct {
 	terminatedChan chan bool
 }
 
-type rmqPubSubResponse struct {
+type RmqPubSubResponse struct {
 	Service string
 	Payload []byte
 }
