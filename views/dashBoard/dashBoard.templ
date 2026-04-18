@@ -1,0 +1,18 @@
+package dashboard
+
+import "fmt"
+import "github.com/mfduar8766/learnKubernetes/lib/models"
+
+templ DashBoard(users []*models.UserModel) {
+	<div class="flex justify-center flex-col">
+		if len(users) == 0 {
+			<div>Failed to get users</div>
+		}
+		for _, user := range users {
+			<div class="user-card">
+				<p>Name: { fmt.Sprintf("%s %s", user.FirstName, user.LastName) }</p>
+				<p>Age: { user.Age }</p>
+			</div>
+		}
+	</div>
+}

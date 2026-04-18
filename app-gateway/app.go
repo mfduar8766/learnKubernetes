@@ -18,29 +18,36 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
-	"github.com/mfduar8766/learnKubernetes/lib/rmq"
+	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
+	"github.com/mfduar8766/learnKubernetes/lib/utils"
 	"github.com/mfduar8766/learnKubernetes/views"
+	"github.com/mfduar8766/learnKubernetes/views/common"
 	"github.com/redis/go-redis/v9"
 )
 
 type AppDeps struct {
-	server      *httpServer.Server
+	server      httpServer.IServer
 	redis       *redis.Client
-	handler     *handlers.RequestHandler
-	broker      *rmq.RMQ
-	log         *logger.Logger
+	handler     handlers.IRequestHandler
+	broker      transport.ITransport
+	log         logger.ILogger
 	tailWindCmd *exec.Cmd
 }
 
-func NewAppDeps(ctx context.Context) func() *AppDeps {
+func New(ctx context.Context) func() *AppDeps {
 	return sync.OnceValue(func() *AppDeps {
 		log := logger.NewLogger(types.APP_GATE_WAY)
 		redisClient := redisDb.ConnectToRedis(ctx, log)
-		broker := rmq.NewRmq(ctx, log, types.APP_GATE_WAY)
-		srv := httpServer.NewServer(ctx, log, 3000)
-		handler := handlers.NewHandler(srv.GetCtx(), broker, log)
-		handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.POSTS_EX, rmq.POSTS_QUEUE, rmq.Events))
+		broker := transport.New(log)
+		err := broker.Connect(ctx, types.APP_GATE_WAY, false)
+		if err != nil {
+			log.LogFatalf("AppGateWay::New()::received error: %+s", err.Error())
+			panic(err)
+		}
+		srv := httpServer.New(ctx, log, utils.GetHostPort(types.APP_GATE_WAY))
+		handler := handlers.New(srv.GetCtx(), broker, log)
+		handler.Subscribe(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users")) //handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Events))
 		appDeps := AppDeps{
 			server:  srv,
 			redis:   redisClient,
@@ -96,26 +103,25 @@ func (a *AppDeps) launchTailWind() {
 	}
 
 	// ALWAYS do an initial build first, regardless of Env
-	a.log.LogInfof("⏳ Performing initial Tailwind build...")
+	a.log.LogInfof("Performing initial Tailwind build...")
 	initialCmd := exec.Command("./tailwindcss", args...)
 	if out, err := initialCmd.CombinedOutput(); err != nil {
-		a.log.LogErrorf("❌ Initial Tailwind build failed: %v\n%s", err, string(out))
+		a.log.LogErrorf("Initial Tailwind build failed: %v\n%s", err, string(out))
 	} else {
-		a.log.LogInfof("✅ Initial CSS generated.")
+		a.log.LogInfof("Initial CSS generated.")
 	}
 
 	if env == types.PROD_ENV {
 		return
 	}
 
-	// Now start the watcher for Dev
 	watchArgs := append(args, "--watch")
 	a.tailWindCmd = exec.Command("./tailwindcss", watchArgs...)
 	a.tailWindCmd.Stdout = os.Stdout
 	a.tailWindCmd.Stderr = os.Stderr
 
 	if err := a.tailWindCmd.Start(); err != nil {
-		a.log.LogErrorf("❌ Failed to start Tailwind watcher: %v", err)
+		a.log.LogErrorf("Failed to start Tailwind watcher: %v", err)
 		return
 	}
 	go func() {
@@ -135,7 +141,11 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 			a.log.LogInfof("Killing Tailwind watcher...")
 			a.tailWindCmd.Process.Kill()
 		}
-		a.broker.Close()
+		a.handler.Unsubscribe(a.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), a.broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users"))
+		err := a.broker.Close()
+		if err != nil {
+			a.log.LogErrorf("AppGateWay::Start()::Failed to disconnect from broker: %+v", err)
+		}
 		cancel()
 		a.log.Close()
 	}()
@@ -148,15 +158,15 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 		}
 
 		if _, err := os.Stat("public/css/style.css"); os.IsNotExist(err) {
-			a.log.LogErrorf("Main::main()::tailWind is not ready yet err: %s", err.Error())
+			a.log.LogErrorf("AppGateWay::Start()::tailWind is not ready yet err: %s", err.Error())
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprint(w, "CSS build in progress...")
 			return
 		}
 
-		if !strings.Contains(r.Header.Get(types.USER_AGENT), "kube") {
+		if !strings.Contains(r.Header.Get(types.HEADER_USER_AGENT), "kube") {
 			a.log.LogInfo(&logger.LoggerPayload{
-				Message: "Main::main()::received readiness check on",
+				Message: "AppGateWay::Start()::received readiness check on",
 				Value: map[string]any{
 					"host":    r.Host,
 					"headers": r.Header,
@@ -164,7 +174,6 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 				},
 			})
 		}
-		w.WriteHeader(http.StatusOK)
 	})
 
 	fileServer := http.FileServer(http.Dir("public"))
@@ -178,21 +187,28 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 		a.handler.ProcessRequests(w, r)
 	}, httpServer.RequestValidation, httpServer.Auth)
 
+	a.server.Post(types.API_ENDPOINT, func(w http.ResponseWriter, r *http.Request) {
+		a.handler.ProcessRequests(w, r)
+	}, httpServer.RequestValidation, httpServer.Auth)
+
 	a.server.Get("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set(types.CONTENT_TYPE, types.APPLICATION_HTML)
-		a.handler.RenderView(w, r, a.handler.GetRouteData(handlers.INDEX), views.SignIn())
+		a.handler.RenderView(w, r, a.handler.GetRouteData(handlers.INDEX_ROUTE), common.LogInForm(types.API_ENDPOINT))
 	})
+
+	a.server.Get(handlers.DASH_BOARD_ROUTE, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Received request for dashBoard: %+v\n", r.Header)
+		a.handler.RenderView(w, r, a.handler.GetRouteData(handlers.DASH_BOARD_ROUTE), views.Home())
+	}, httpServer.Auth)
 
 	wg.Go(func() {
 		if err := a.server.ListenAndServe(); err != nil && err == http.ErrServerClosed {
-			a.log.LogErrorf("Main::main()::serverClosed::%+v", err.Error())
+			a.log.LogErrorf("AppGateWay::Start()::serverClosed::%+v", err.Error())
 			cancel()
 		}
 	})
 
 	a.log.LogInfo(&logger.LoggerPayload{
-		Message: "Main::main()::Server is running on",
+		Message: "AppGateWay::Start()::Server is running on",
 		Value: map[string]string{
 			"host": "127.0.0.1",
 			"port": "3000",
@@ -200,16 +216,17 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 	})
 
 	<-ctx.Done()
-	a.log.LogInfof("Main::main()::received shutdown signal...")
+	a.log.LogInfof("AppGateWay::Start()::received shutdown signal...")
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer shutdownCancel()
+
+	a.log.LogInfof("AppGateWay::Start()::Closing database connections...")
+
+	if err := a.redis.Close(); err != nil {
+		a.log.LogErrorf("AppGateWay::Start()::Failed to disconnect from redis: %+v", err)
+	}
 
 	a.server.Shutdown(shutdownCtx)
 
-	a.log.LogInfof("Main::main()::Closing database connections...")
-
-	// if err := a.Redis.Close(); err != nil {
-	// 	app.Log.LogErrorf("Main::main()::Failed to disconnect from redis: %+v", err)
-	// }
 }

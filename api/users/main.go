@@ -10,12 +10,15 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
+	"github.com/eclipse/paho.golang/paho"
 	"github.com/mfduar8766/learnKubernetes/handlers"
+	"github.com/mfduar8766/learnKubernetes/lib/db/mongoDb"
+	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
-	"github.com/mfduar8766/learnKubernetes/lib/models"
-	"github.com/mfduar8766/learnKubernetes/lib/rmq"
+	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
 	"github.com/redis/go-redis/v9"
@@ -23,34 +26,37 @@ import (
 )
 
 type AppDeps struct {
-	Server  httpServer.IServer
-	Redis   *redis.Client
-	Handler *handlers.RequestHandler
-	broker  rmq.IRabbitMq
-	Log     logger.ILogger
-	Mongo   *mongo.Client
+	server  httpServer.IServer
+	redis   *redis.Client
+	handler handlers.IRequestHandler
+	broker  transport.ITransport
+	log     logger.ILogger
+	mongo   *mongo.Client
 }
 
 func NewAppDeps(ctx context.Context) func() *AppDeps {
 	return sync.OnceValue(func() *AppDeps {
-		log := logger.NewLogger(types.APP_GATE_WAY)
-		// redisClient := redisDb.ConnectToRedis(ctx, log)
-		// mongoClient, err := mongoDb.ConnectToMongo(ctx, log)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		broker := rmq.NewRmq(ctx, log, types.APP_GATE_WAY)
-		srv := httpServer.NewServer(ctx, log, 3001)
-		handler := handlers.NewHandler(srv.GetCtx(), broker, log)
-		handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.POSTS_EX, rmq.POSTS_QUEUE, rmq.Events))
-
+		log := logger.NewLogger(types.APP_USERS_SERVICE)
+		redisClient := redisDb.ConnectToRedis(ctx, log)
+		mongoClient, err := mongoDb.ConnectToMongo(ctx, log)
+		if err != nil {
+			panic(err)
+		}
+		broker := transport.New(log)
+		err = broker.Connect(ctx, types.APP_USERS_SERVICE, false)
+		if err != nil {
+			panic(err)
+		}
+		srv := httpServer.New(ctx, log, utils.GetHostPort(types.APP_USERS_SERVICE))
+		handler := handlers.New(srv.GetCtx(), broker, log)
+		handler.Subscribe(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users")) //handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS
 		appDeps := AppDeps{
-			Server: srv,
-			// Redis:   redisClient,
-			Handler: handler,
+			server:  srv,
+			redis:   redisClient,
+			handler: handler,
 			broker:  broker,
-			Log:     log,
-			// Mongo:   mongoClient,
+			log:     log,
+			mongo:   mongoClient,
 		}
 		return &appDeps
 	})
@@ -61,24 +67,28 @@ func main() {
 		wg    sync.WaitGroup
 		ctx            = context.Background()
 		app   *AppDeps = NewAppDeps(ctx)()
-		users *Users   = NewUsers(app.broker, app.Log)
+		users *Users   = NewUsers(app.broker, app.log)
 	)
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	defer func() {
-		app.broker.Close()
+		app.handler.Unsubscribe(app.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), app.broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users"))
+		err := app.broker.Close()
+		if err != nil {
+			app.log.LogErrorf("AppGateWay::Start()::Failed to disconnect from broker: %+v", err)
+		}
 		cancel()
-		app.Log.Close()
+		app.log.Close()
 	}()
 
-	app.Server.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
-		if app.Redis == nil || app.broker == nil {
-			w.WriteHeader(http.StatusBadRequest)
+	app.server.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+		if app.redis == nil || app.broker == nil || app.mongo == nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "%+v", errors.New("failed to connect to dbs..."))
 			return
 		}
-		if !strings.Contains(r.Header.Get(types.USER_AGENT), "kube") {
-			app.Log.LogInfo(&logger.LoggerPayload{
+		if !strings.Contains(r.Header.Get(types.HEADER_USER_AGENT), "kube") {
+			app.log.LogInfo(&logger.LoggerPayload{
 				Message: "Main::main()::received readiness check on",
 				Value: map[string]any{
 					"host":    r.Host,
@@ -89,22 +99,32 @@ func main() {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-
-	app.broker.Listen(app.broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), func(req *models.MessagePayload) ([]byte, error) {
-		app.Log.LogInfof("Processing event: %s on topic: %+v", req.Event, req.Topic)
+	topic := app.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users")
+	app.broker.RegisterHandler(topic, func(p *paho.Publish) {
+		app.log.LogInfof("Processing: %+v", map[string]any{
+			"topic":         p.Topic,
+			"payload":       string(p.Payload),
+			"responseTopic": p.Properties.ResponseTopic,
+		})
 		response, err := users.GetUsers()
-		utils.HandleError(err, "main()", "Error getting users...", app.Log)
-		return response, nil
+		utils.HandleError(err, "main()", "Error getting users...", app.log)
+		if err != nil {
+			return
+		}
+		messageID, err := app.broker.Publish(ctx, p.Properties.ResponseTopic, response, nil)
+		if err != nil {
+			app.log.LogErrorf("Failed to publish response for messageID: %s on topic %s: %+v", messageID, topic, err)
+		}
 	})
 
 	wg.Go(func() {
-		if err := app.Server.ListenAndServe(); err != nil && err == http.ErrServerClosed {
-			app.Log.LogErrorf("Main::main()::ListenAndServe()::%+v", err.Error())
+		if err := app.server.ListenAndServe(); err != nil && err == http.ErrServerClosed {
+			app.log.LogErrorf("Main::main()::ListenAndServe()::%+v", err.Error())
 			cancel()
 		}
 	})
 
-	app.Log.LogInfo(&logger.LoggerPayload{
+	app.log.LogInfo(&logger.LoggerPayload{
 		Message: "Main::main()::Server is running on",
 		Value: map[string]string{
 			"host": "127.0.0.1",
@@ -113,16 +133,22 @@ func main() {
 	})
 
 	<-ctx.Done()
-	// shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
-	// defer shutdownCancel()
+	shutDownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer shutdownCancel()
 
-	// if err := app.Redis.Close(); err != nil {
-	// 	app.Log.LogErrorf("Main::main()::Failed to disconnect from redis: %+v", err.Error())
+	if err := app.redis.Close(); err != nil {
+		app.log.LogErrorf("Main::main()::Failed to disconnect from redis: %+v", err.Error())
+	}
+
+	if err := app.mongo.Disconnect(shutDownCtx); err != nil {
+		app.log.LogErrorf("Main::main()::Failed to disconnect from mongo: %+v", err.Error())
+	}
+
+	// if err := app.broker.Close(); err != nil {
+	// 	app.log.LogErrorf("Main::main()::Failed to disconnect from broker: %+v", err)
 	// }
 
-	// if err := app.Mongo.Disconnect(shutdownCtx); err != nil {
-	// 	app.Log.LogErrorf("Main::main()::Failed to disconnect from mongo: %+v", err.Error())
-	// }
+	app.server.Shutdown(shutDownCtx)
 
-	app.Log.LogInfof("Main::main()::App exited cleanly")
+	app.log.LogInfof("Main::main()::App exited cleanly")
 }

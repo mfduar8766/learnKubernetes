@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
-	"github.com/mfduar8766/learnKubernetes/lib/models"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -15,7 +14,8 @@ type IRabbitMq interface {
 	Publish(topic string, message []byte)
 	PubSub(ctx context.Context, topic string, message []byte) (*RmqPubSubResponse, error)
 	Consume(topic string)
-	Listen(topic string, handler func(*models.MessagePayload) ([]byte, error))
+	// Listen(topic string, handler func(*models.MessagePayload) ([]byte, error))
+	Listen(topic string, handler func(any) ([]byte, error))
 	ClearSubscriptions()
 	Close() error
 }

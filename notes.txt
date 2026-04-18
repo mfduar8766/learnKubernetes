@@ -28,7 +28,11 @@ Architecture:
         Have kubelet process running on each node that allows clusters to communicate with each other.
         Where the applications are running like docker containers.
     Cluster:
-        Combination of all nodes
+        Set of resources that make up the k8s system. Comprised of Nodes.
+        Control Plane: The system that comprises k8s its self.
+            Control Plane Nodes:
+        Data Plane: Where our apps/pods/services ETC live
+            Worker Nodes:
 ======================================================================================================================================================================
 
 Components:
@@ -182,6 +186,39 @@ With LoadBalancer:
 User → Load Balancer IP (Port 80) → All Nodes (NodePort) → Service → Pod
     Solution: The Load Balancer acts as a single "Front Door." It sits in front of all your nodes.
     If Node A dies, the Load Balancer just sends traffic to Node B.
+
+Proxy: If I go to port 42069 I will be forwarded to the port 3000 which is the container port. This applies if I have X number of containers.
+    The port is the service port. TARGETpORT IS The containerPort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+spec:
+  type: ClusterIP
+  selector:
+    app: gateway
+  ports:
+    - protocol: TCP
+      port: 42069
+      targetPort: 3000
+      nodePort: XXX
+ClusterIP Service: Pod to pod communication.
+    Example:
+    Pod 1 wants to talk to Pod 3, The service for Pod3 is accessed through Kube Proxy (nodePort).
+    Every node in a cluster have a Kube Proxy. Kube Proxy has an IP table for all nodes in a cluster.
+    Uses a Round Robin algorithm to determine which Pod(s) if there are replicas get the traffic. Pod MUST BE HEALTHY.
+    Every Kube Proxy table has access to the same routing information. Example 1 cluster 3 Nodes X pods per Node
+        every Node has the same table mapping.
+    Cluster:
+        Node1:
+            Pod1: 123
+            Pd2: 456
+                Service: Expose Pod3
+                    port: 234
+                    targetPort: 345
+                    nodePort: 456
+NodePort: Allow external access in the cluster without using kubectl.
+Load Balancer: Still use nodePort but requires an external machine to your cluster to accept incoming traffic.
 ======================================================================================================================================================================
 
 NameSpaces: Used to organize resources in a cluster. LIke a virtual cluster inside the existing cluster.
@@ -327,3 +364,59 @@ Volumes:
         - name: mongo-storage
           persistentVolumeClaim:
             claimName: mongo-pvc # The persistent storage
+======================================================================================================================================================================
+
+Network Policies: Determines what service can talk to what service in a cluster. NameSpace specific. Its all about controlling incoming/outgoing traffic.
+Can control both or one or the other Ingress/Egress.
+FOR MINIKUBE: minikube start --cni=calico
+Example:
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default - # TARGET THE NameSpace OF THE PODS YOU WANT TO CONTROL
+spec:
+  podSelector: # What pods are we controlling? Example (app:gateway)
+    matchLabels: # Deployment labels (app:gateway, app:users ETC...). If I am on default nameSpace and I have the label app:gateway
+    I am controllling the traffic for that.
+      role: db
+      app: gateway # (FOR EXAMPLE)
+  policyTypes: # Control one or the other or both
+  - Ingress # INCOMING TRAFFIC
+            # All pods in the default nameSpace that have the labels (role:db) (app:gateway) you MAY ONLY RECEIVE incoming 
+            # traffic from pods 
+            # in this Ips range or pods from that nameSpace or pods with these selectors. ALL THESE ARE OR NOT AND.
+            # So these rules only apply in OR not AND
+  - Egress -# OUT GOING TRAFFIC
+                # All pods in the default nameSpace that have the labels (role:db) (app:gateway) you MAY ONLY SEND
+                # outgoing traffic to pods 
+                # in this Ips range or pods on that nameSpace or pods with these selectors. ALL THESE ARE OR NOT AND.
+                # So these rules only apply in OR not AND
+  ingress: # WHERE RULES FOR TRAFFIC ARE DEFINED
+  - from: # Traffic HAS to come from ONE of the following sources (ipBlock, namespaceSelector, podSelector)
+    - ipBlock: # MUST BE FROM THIIS IPS RANGE
+        cidr: 172.17.0.0/16 # Range of IPs. Has to be that pod in this range or it wont allow that pod to send ingress
+        except: # Allow pods in that range except for these
+        - 172.17.1.0/24
+    - namespaceSelector: #MUST BE FROM THIS NameSpace
+        # IF PODS ARE IN DIFFERENT NameSpaces as long as they are exposed by a service then all pods can talk to each other
+        # regardless of nameSpace.
+        # Example pods in the default nameSpace that have the label role:db, app:gateway ECT... you are ONLY allowed to
+        # receive traffic from pods taht are in this IP address range
+        # or pods that are in any nameSpace that have the label (project:myproject)
+        matchLabels:
+          project: myproject
+    - podSelector: # MUST BE FROM POD WITH THIS LABEL (role: frontend)
+        matchLabels:
+          role: frontend
+    ports: # You CAN ONLY receive traffic on these ports
+    - protocol: TCP
+      port: 6379
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 10.0.0.0/24
+    ports:
+    - protocol: TCP
+      port: 5978
+======================================================================================================================================================================

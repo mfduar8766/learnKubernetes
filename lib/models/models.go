@@ -14,21 +14,21 @@ type Posts struct {
 	Body   string `json:"body"`
 }
 
-type ResponsePayloadParams struct {
+type ResponsePayloadParams[T any] struct {
 	Result types.ResponsePayloadResults `json:"result"`
-	Data   any                          `json:"data"`
+	Data   T                            `json:"data"`
 }
 
-type MessagePayload struct {
+type MessagePayload[T any] struct {
 	Event    events.UserEventsType `json:"event"`
 	*Params  `json:"params,omitempty"`
-	Response *ResponsePayloadParams `json:"response,omitempty"`
-	Error    map[string]any         `json:"error,omitempty"`
-	Topic    string                 `json:"topic"`
+	Response *ResponsePayloadParams[T] `json:"response,omitempty"`
+	Error    map[string]any            `json:"error,omitempty"`
+	Topic    string                    `json:"topic"`
 }
 
-func CreateNewMessagePayload(topic string, event events.UserEvents, params *Params, response *ResponsePayloadParams, errorMessage map[string]interface{}) *MessagePayload {
-	return &MessagePayload{
+func CreateNewMessagePayload[T any](topic string, event events.UserEvents, params *Params, response *ResponsePayloadParams[T], errorMessage map[string]interface{}) *MessagePayload[T] {
+	return &MessagePayload[T]{
 		Event:    events.UserEventsType(event),
 		Params:   params,
 		Response: response,
@@ -37,7 +37,7 @@ func CreateNewMessagePayload(topic string, event events.UserEvents, params *Para
 	}
 }
 
-func (m *MessagePayload) Marshall() ([]byte, error) {
+func (m *MessagePayload[T]) Marshall() ([]byte, error) {
 	messageBytes, err := json.Marshal(m)
 	return messageBytes, err
 }

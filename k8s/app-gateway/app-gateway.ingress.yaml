@@ -26,13 +26,13 @@ spec:
                 name: gateway-service # MUST match your Service name
                 port:
                   number: 3000 # MUST match your Service port
-    - host: rmq.myk8sapptest.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: rmq-service
-                port:
-                  number: 15672
+    # - host: rmq.myk8sapptest.com
+    #   http:
+    #     paths:
+    #       - path: /
+    #         pathType: Prefix
+    #         backend:
+    #           service:
+    #             name: rmq-service
+    #             port:
+    #               number: 15672

@@ -1,4 +1,4 @@
-FROM golang:latest AS development
+FROM golang:1.26.2-alpine AS development
 
 WORKDIR /usr/src/app
 

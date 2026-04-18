@@ -23,7 +23,7 @@ spec: # DEPLOYMENT SPEFICICATIONS
           # IfNotPresent: Only pulls image if it DOES NOT EXIST on the node
           imagePullPolicy: Never # Tell K8s to look locally instead of trying to download it
           ports:
-            - containerPort: 3000
+            - containerPort: 3000 # TARGET_PORT
             # envFrom IS PROCCESSED FIRST THEN env:
           envFrom: # THIS WILL TAKE THE VALUES FROM THESE FILES UNDER THE DATA: FIELD SO NAMES MUST MATCH EXACTLY
             - configMapRef:
@@ -34,15 +34,22 @@ spec: # DEPLOYMENT SPEFICICATIONS
                 name: redis-secret
             - configMapRef:
                 name: redis-config
-            - secretRef:
-                name: rmq-secret
             - configMapRef:
-                name: rmq-config
+                name: mqtt-config
+            - secretRef:
+                name: mqtt-secret
+            # - secretRef:
+            #     name: rmq-secret
+            # - configMapRef:
+            #     name: rmq-config
           env:
-            - name: RABBITMQ_URI
-              value: "amqp://$(RABBITMQ_DEFAULT_USER):$(RABBITMQ_DEFAULT_PASS)@$(RABBITMQ_HOST)"
+            # - name: RABBITMQ_URI
+            #   value: "amqp://$(RABBITMQ_DEFAULT_USER):$(RABBITMQ_DEFAULT_PASS)@$(RABBITMQ_HOST)"
             - name: "CURRENT_ENV"
               value: "PROD"
+            - name: HOST_PORT
+              value: "3000"
+
           # 1. Is the app alive? (If no, restart it)
           # httpGet: Hits an endpoint. A response code between 200–399 is a "success." (STANDARD)
           # exec: Runs a command inside the container (e.g., cat /tmp/healthy). If the command returns exit code 0, it's a "success."
@@ -81,8 +88,8 @@ spec:
     app: gateway
   ports:
     - protocol: TCP
-      port: 3000 # 2. OPTIONAL: Change to 80 so you don't have to type :3000 in the browser. ONLLY IF USING LoadBalancer
-      targetPort: 3000 # 3. KEEP THIS: This must still match your containerPort
+      port: 3000 # 2. PORT ON THE SERVICE ITS SELF. OPTIONAL: Change to 80 so you don't have to type :3000 in the browser. ONLLY IF USING LoadBalancer
+      targetPort: 3000 # 3. KEEP THIS: This MUST match your containerPort
 
 
 # EXAMPLE OF EXTERNAL SERVICE NO INGRESS USING NodePort

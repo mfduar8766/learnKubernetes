@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mqtt-config
+  # namespace: myNameSpace
+data:
+  MQTT_BROKER_URL: "mqtt-service:1883"
+  MQTT_BROKER_URL_TLS: "mqtt-service:8883"
