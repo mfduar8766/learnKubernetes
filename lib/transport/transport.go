@@ -185,7 +185,6 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 
 	wg.Go(func() {
 		defer func() {
-			fmt.Println("publishWithResponse()::cleaning up map...")
 			b.reqResLock.Lock()
 			delete(b.requestResponseChan, corID)
 			b.reqResLock.Unlock()

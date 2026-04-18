@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mfduar8766/learnKubernetes/handlers"
+	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
@@ -37,7 +38,7 @@ type AppDeps struct {
 func New(ctx context.Context) func() *AppDeps {
 	return sync.OnceValue(func() *AppDeps {
 		log := logger.NewLogger(types.APP_GATE_WAY)
-		// redisClient := redisDb.ConnectToRedis(ctx, log)
+		redisClient := redisDb.ConnectToRedis(ctx, log)
 		broker := transport.New(log)
 		err := broker.Connect(ctx, types.APP_GATE_WAY, false)
 		if err != nil {
@@ -46,11 +47,10 @@ func New(ctx context.Context) func() *AppDeps {
 		}
 		srv := httpServer.New(ctx, log, utils.GetHostPort(types.APP_GATE_WAY))
 		handler := handlers.New(srv.GetCtx(), broker, log)
-		// handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.POSTS_EX, rmq.POSTS_QUEUE, rmq.Events))
 		handler.Subscribe(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users")) //handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Events))
 		appDeps := AppDeps{
-			server: srv,
-			// redis:   redisClient,
+			server:  srv,
+			redis:   redisClient,
 			handler: handler,
 			broker:  broker,
 			log:     log,
