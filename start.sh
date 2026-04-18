@@ -185,36 +185,20 @@ fi
 echo "-------------------------------------------------------"
 echo "✅ Done! Application should be at http://$MY_APP_TEST"
 
-# --- NEW ROBUST CLEANUP SECTION ---
-echo "🧹 Cleaning up Port 80 for the Ingress Bridge..."
-PORT_80_PID=$(echo "$MY_PASS" | sudo -S lsof -t -i:80 2>/dev/null)
-
-if [ ! -z "$PORT_80_PID" ]; then
-    echo "Found existing process $PORT_80_PID on port 80. Killing it..."
-    echo "$MY_PASS" | sudo -S kill -9 $PORT_80_PID
-fi
-
-echo "🧹 Cleaning up Port 1883 for the Broker..."
-BROKER_PORT_PID=$(echo "$MY_PASS" | sudo -S lsof -t -i:1883 2>/dev/null)
-
-if [ ! -z "$BROKER_PORT_PID" ]; then
-    echo "Found existing process $BROKER_PORT_PID on port 80. Killing it..."
-    echo "$MY_PASS" | sudo -S kill -9 $BROKER_PORT_PID
-fi
-
-echo "$MY_PASS" | sudo -S pkill -9 -f "port-forward" || true
+echo "🧹 Cleaning up existing port-forwards..."
+# The [p] trick prevents the script from killing its own pkill command
+echo "$MY_PASS" | sudo -S pkill -9 -f "[p]ort-forward" || true
 sleep 2
 
-BROKER_POD=$($K8S_CMD get pods -l app=mqtt)
+# Get ONLY the name of the MQTT pod
+BROKER_POD=$($K8S_CMD get pods -l app=mqtt -o jsonpath='{.items[0].metadata.name}')
 
-echo "🔐 Starting Broker on Port 1883..."
-echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward $BROKER_POD 1883:1883 --address 0.0.0.0 &
+if [ -z "$BROKER_POD" ]; then
+    echo "❌ ERROR: MQTT Pod not found. Cannot port-forward."
+else
+    echo "🔐 Starting Broker on Port 1883 for pod: $BROKER_POD"
+    echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward "$BROKER_POD" 1883:1883 --address 0.0.0.0 &
+fi
 
 echo "🔐 Starting Ingress Bridge on Port 80..."
 echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0
-
-# echo "Killing existing port-forwards..."
-# echo "$MY_PASS" | sudo -S pkill -f "port-forward -n ingress-nginx"
-
-# echo "🔐 Starting Ingress Bridge on Port 80..."
-# echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx deployment/ingress-nginx-controller 80:80

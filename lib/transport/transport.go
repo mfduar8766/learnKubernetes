@@ -85,7 +85,7 @@ func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) erro
 		WillMessage: &paho.WillMessage{
 			Topic:   fmt.Sprintf("%s/%s/status", API_VERSION, clientID),
 			Payload: willPayload,
-			QoS:     1,
+			QoS:     DEFAULT_QoS,
 			Retain:  true,
 		},
 	})
@@ -98,6 +98,18 @@ func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) erro
 	}
 
 	b.logger.LogInfo(&logger.LoggerPayload{Message: "Connected to broker", Value: brokerConnection[types.MQTT_BROKER_URL]})
+
+	// willPayload, err = utils.JsonMarshall(ServiceStatus{
+	// 	Status: ONLINE,
+	// 	Event:  ONLINE,
+	// })
+	// if err != nil {
+	// 	return fmt.Errorf("failed to marshal LWT: %w", err)
+	// }
+	// b.Publish(ctx, fmt.Sprintf("%s/%s/status", API_VERSION, clientID), willPayload, &PublishRequest{
+	// 	QoS:    DEFAULT_QoS,
+	// 	Retain: true,
+	// })
 	return nil
 }
 
