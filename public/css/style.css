@@ -11,7 +11,6 @@
     --color-blue-500: oklch(62.3% 0.214 259.815);
     --color-blue-700: oklch(48.8% 0.243 264.376);
     --color-blue-800: oklch(42.4% 0.199 265.638);
-    --color-gray-500: oklch(55.1% 0.027 264.364);
     --color-gray-700: oklch(37.3% 0.034 259.733);
     --color-white: #fff;
     --spacing: 0.25rem;
@@ -180,6 +179,9 @@
   .start {
     inset-inline-start: var(--spacing);
   }
+  .end {
+    inset-inline-end: var(--spacing);
+  }
   .container {
     width: 100%;
     @media (width >= 40rem) {
@@ -227,6 +229,9 @@
   }
   .inline-block {
     display: inline-block;
+  }
+  .table {
+    display: table;
   }
   .h-full {
     height: 100%;
@@ -283,9 +288,6 @@
   .pb-8 {
     padding-bottom: calc(var(--spacing) * 8);
   }
-  .text-center {
-    text-align: center;
-  }
   .align-baseline {
     vertical-align: baseline;
   }
@@ -307,9 +309,6 @@
   }
   .text-blue-500 {
     color: var(--color-blue-500);
-  }
-  .text-gray-500 {
-    color: var(--color-gray-500);
   }
   .text-gray-700 {
     color: var(--color-gray-700);
@@ -351,12 +350,6 @@
       outline-style: none;
     }
   }
-}
-body {
-  height: 100%;
-  width: 100%;
-  padding: 0;
-  margin: 0;
 }
 .cursor {
   cursor: pointer;

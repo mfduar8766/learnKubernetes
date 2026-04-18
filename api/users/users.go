@@ -6,17 +6,16 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/events"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/models"
-	"github.com/mfduar8766/learnKubernetes/lib/rmq"
+	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
-	"github.com/mfduar8766/learnKubernetes/lib/utils"
 )
 
 type Users struct {
-	broker rmq.IRabbitMq
+	broker transport.ITransport
 	log    logger.ILogger
 }
 
-func NewUsers(broker rmq.IRabbitMq, log logger.ILogger) *Users {
+func NewUsers(broker transport.ITransport, log logger.ILogger) *Users {
 	return &Users{
 		broker: broker,
 		log:    log,
@@ -50,15 +49,11 @@ func (u *Users) GetUsers() ([]byte, error) {
 			ActivationCode: "",
 		},
 	}
-	userBytes, err := utils.JsonMarshall(users)
-	if err != nil {
-		u.log.LogErrorf("Users::GetUsers()::received marshall error: %+v", err.Error())
-		return nil, err
-	}
-	topic := u.broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request)
-	response := models.CreateNewMessagePayload(topic, events.UserEvents(events.GET_USERS), nil, &models.ResponsePayloadParams{
+	// topic := u.broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request)
+	topic := u.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users")
+	response := models.CreateNewMessagePayload(topic, events.UserEvents(events.GET_USERS), nil, &models.ResponsePayloadParams[[]*models.UserModel]{
 		Result: types.ResponsePayloadResults(types.SUCCESS),
-		Data:   string(userBytes),
+		Data:   users,
 	}, nil)
 	responseBytes, err := response.Marshall()
 	if err != nil {

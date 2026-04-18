@@ -65,11 +65,18 @@ func RequestValidation(ctx ICtx, log logger.ILogger, w http.ResponseWriter, r *h
 }
 
 func Auth(ctx ICtx, log logger.ILogger, w http.ResponseWriter, r *http.Request) error {
-	tokenHeader := r.Header.Get(types.HEADER_TOKEN)
-	if len(tokenHeader) == 0 {
+	log.LogInfof("MiddleWare()::Auth()::received request")
+	if ctx.GetCtxValue(types.HEADER_TOKEN) == nil {
+		return nil
+	}
+	tokenHeader, err := r.Cookie(types.HEADER_TOKEN)
+	if err != nil {
+		return err
+	}
+	if len(tokenHeader.Value) == 0 {
 		return fmt.Errorf("token is empty")
 	} else {
-		if tokenHeader == "SOME_TOKEN" {
+		if tokenHeader.Value == "SOME_TOKEN" {
 			ctx.SetCtxValue(types.HEADER_TOKEN, tokenHeader)
 			return nil
 		}

@@ -9,7 +9,7 @@ import (
 func main() {
 	var (
 		ctx                     = context.Background()
-		app *appgateway.AppDeps = appgateway.NewAppDeps(ctx)()
+		app *appgateway.AppDeps = appgateway.New(ctx)()
 	)
 	app.Start(ctx)
 }

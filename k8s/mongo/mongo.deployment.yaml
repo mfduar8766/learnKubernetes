@@ -17,9 +17,15 @@ spec:
       containers:
         - name: mongodb
           image: mongo:latest
-          # --- MANDATORY FOR apt-get TO WORK ---
-          # securityContext:
-          #   runAsUser: 0
+          # lifecycle:
+          #   postStart:
+          #     exec:
+          #       command:
+          #         [
+          #           "/bin/sh",
+          #           "-c",
+          #           "echo 'Hello from postStart' > /usr/share/message",
+          #         ]
           ports:
             - containerPort: 27017
           envFrom:
@@ -27,22 +33,6 @@ spec:
                 name: mongo-secret
             - configMapRef:
                 name: mongo-config
-          # lifecycle:
-          #   postStart:
-          #     exec:
-          #       command:
-          #         - /bin/sh
-          #         - -c
-          #         - >
-          #           if ! command -v mongoimport &> /dev/null; then
-          #             apt-get update && apt-get install -y mongodb-database-tools;
-          #           fi;
-          #           sleep 5;
-          #           mongoimport --host localhost \
-          #           --username $(MONGO_INITDB_ROOT_USERNAME) \
-          #           --password $(MONGO_INITDB_ROOT_PASSWORD) \
-          #           --authenticationDatabase admin \
-          #           --db test --collection users --type json --file /data/init/initDb.json --jsonArray --upsert
           volumeMounts:
             - name: init-data-volume
               mountPath: /data/init # Where the JSON file sits THIS WILL OVERRIDE EXISTING DIRS IN A CONTAINER SO IT MUST BE UNIQUE

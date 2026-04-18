@@ -1,0 +1,71 @@
+# 1. ALLOW APPS (Gateway & Users) TO REACH INFRA
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apps-outbound-policy
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: ["users", "gateway"] }
+  policyTypes:
+    - Egress
+  egress:
+    # Traffic to Mosquitto
+    - to: [{ podSelector: { matchLabels: { app: mqtt } } }]
+      ports: [{ protocol: TCP, port: 1883 }]
+    # Traffic to Redis
+    - to: [{ podSelector: { matchLabels: { app: redis } } }]
+      ports: [{ protocol: TCP, port: 6379 }]
+    # Traffic to Mongo
+    - to: [{ podSelector: { matchLabels: { app: mongo } } }]
+      ports: [{ protocol: TCP, port: 27017 }]
+    # Traffic to DNS (Crucial for resolving "mqtt-service")
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# 2. INFRASTRUCTURE INGRESS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: infra-ingress-policy
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: ["mqtt", "redis", "mongo"] }
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: ["gateway", "users"] }
+      # Allow apps to hit the specific infra ports
+      ports:
+        - { protocol: TCP, port: 1883 }
+        - { protocol: TCP, port: 6379 }
+        - { protocol: TCP, port: 27017 }
+---
+# 3. PUBLIC ENTRY POINT (Gateway Ingress ONLY)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-public-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000

@@ -2,6 +2,7 @@ package httpServer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
+	"github.com/mfduar8766/learnKubernetes/lib/utils"
 )
 
 type MiddleWareOptions func(ctx ICtx, log logger.ILogger, w http.ResponseWriter, r *http.Request) error
@@ -17,49 +19,111 @@ type HttpHandler func(http.ResponseWriter, *http.Request)
 type HttpHandlerFunc map[string]func(handler HttpHandler, middleWare ...MiddleWareOptions) HttpHandler
 type Routes map[string]string
 type SetOptions func(*Server)
-type ReturnCtx struct {
+type ReturnCtxWithCancel struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
+type ReturnCtx struct {
+	Ctx context.Context
+}
 
 type Ctx struct {
-	ctx context.Context
-	// We use any (interface{}) to avoid the "Context Chaining" memory leak
-	ctxMap map[string]any
-	lock   sync.RWMutex // No pointer needed if the struct is passed by ref
+	ctx    context.Context
+	lock   sync.RWMutex
+	ctxMap map[string]context.Context
 }
 
 func NewCtx(ctx context.Context) *Ctx {
 	return &Ctx{
 		ctx:    ctx,
-		ctxMap: make(map[string]any),
-		// sync.RWMutex zero-value is ready to use
+		ctxMap: make(map[string]context.Context),
 	}
 }
 
-// GetCtxValue now performs a flat O(1) lookup
+func (c *Ctx) GetCtx(key string) (*ReturnCtx, error) {
+	if ctx, exists := c.ctxMap[key]; exists {
+		return &ReturnCtx{
+			Ctx: ctx,
+		}, nil
+	}
+	return nil, errors.New("context does not exist")
+}
+
 func (c *Ctx) GetCtxValue(key string) any {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.ctxMap[key]
+	if value := c.ctxMap[key]; value != nil {
+		return value.Value(key)
+	}
+	return nil
 }
 
-// SetCtxValue now updates the map directly without nesting contexts
 func (c *Ctx) SetCtxValue(key string, value any) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.ctxMap[key] = value
+	if _, exists := c.ctxMap[key]; !exists {
+		c.ctxMap[key] = context.WithValue(c.ctx, key, value)
+		return
+	}
+	c.ctxMap[key] = context.WithValue(c.ctxMap[key], key, value)
 }
 
-// WithTimeout derives a child context from the base request context
-func (c *Ctx) WithTimeout(timeOut time.Duration) (*ReturnCtx, error) {
-	// We don't need a lock here because c.ctx is typically read-only
-	ctxTimeOut, cancel := context.WithTimeout(c.ctx, timeOut)
+func (c *Ctx) WithTimeout(key string, timeOut time.Duration) (*ReturnCtxWithCancel, error) {
+	if ctx, exists := c.ctxMap[key]; exists {
+		ctxTimeOut, cancel := context.WithTimeout(ctx, timeOut)
+		return &ReturnCtxWithCancel{
+			Ctx:    ctxTimeOut,
+			Cancel: cancel,
+		}, nil
+	}
+	return nil, fmt.Errorf("no context found...")
+}
 
-	return &ReturnCtx{
-		Ctx:    ctxTimeOut,
-		Cancel: cancel,
-	}, nil
+// func (c *Ctx) GetCtxValue(key string) any {
+// 	c.lock.RLock()
+// 	defer c.lock.RUnlock()
+// 	return c.ctxMap[key]
+// }
+
+// func (c *Ctx) SetCtxValue(key string, value any) {
+// 	c.lock.Lock()
+// 	defer c.lock.Unlock()
+// 	c.ctxMap[key] = value
+// }
+
+// func (c *Ctx) WithTimeout(timeOut time.Duration) (*ReturnCtx, error) {
+// 	ctxTimeOut, cancel := context.WithTimeout(c.ctx, timeOut)
+// 	return &ReturnCtx{
+// 		Ctx:    ctxTimeOut,
+// 		Cancel: cancel,
+// 	}, nil
+// }
+
+func (c *Ctx) SetCookies(w http.ResponseWriter, key, value string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	cookie := &http.Cookie{
+		Name:     key,
+		Value:    value,
+		HttpOnly: true,
+		Secure:   false,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+	}
+	if utils.GetCurrentENV() == types.PROD_ENV {
+		cookie.Expires = time.Now().Add(time.Hour)
+	}
+	http.SetCookie(w, cookie)
+}
+
+func (c *Ctx) GetCookie(name string) (*http.Cookie, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	cookie, err := http.ParseSetCookie(name)
+	if err != nil {
+		return nil, err
+	}
+	return cookie, nil
 }
 
 type Server struct {
@@ -68,9 +132,10 @@ type Server struct {
 	server     *http.Server
 	getCtxLock *sync.RWMutex
 	mux        *http.ServeMux
+	cors       map[string][]string
 }
 
-func NewServer(ctx context.Context, logger logger.ILogger, addr int) *Server {
+func New(ctx context.Context, logger logger.ILogger, addr int) *Server {
 	mux := http.NewServeMux()
 	s := Server{
 		ctx:        NewCtx(ctx),
@@ -78,9 +143,24 @@ func NewServer(ctx context.Context, logger logger.ILogger, addr int) *Server {
 		logger:     logger,
 		getCtxLock: &sync.RWMutex{},
 		mux:        mux,
+		cors: map[string][]string{
+			types.HEADER_CORS_ACCESS_CONTROL_ALLOW_ORIGIN:  {types.ALLOW_ORIGIN_URL_LOCAL_HOST, types.ALLOW_ORIGIN_URL_CLUSTER},
+			types.HEADER_CORS_ACCESS_CONTROL_ALLOW_HEADERS: {types.HEADER_AUTHORIZATION, types.HEADER_APPLICATION_CSS, types.HEADER_APPLICATION_HTML, types.HEADER_APPLICATION_JSON, types.HEADER_CONTENT_TYPE, types.HEADER_HX_LOCATION, types.HEADER_HX_REQUEST, types.HEADER_HX_RESWAP, types.HEADER_HX_RETARGET, types.HEADER_COOKIE},
+			types.HEADER_CORS_ACCESS_CONTROL_ALLOW_METHODS: {http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
+		},
 	}
 	s.ping()
 	return &s
+}
+
+func (s *Server) SetCore(rules map[string][]string) {
+	for key, newValue := range rules {
+		if currentValue, exists := s.cors[key]; !exists {
+			s.cors[key] = newValue
+		} else {
+			currentValue = append(currentValue, newValue...)
+		}
+	}
 }
 
 func (s *Server) GetCtx() ICtx {
@@ -126,12 +206,17 @@ func (s *Server) Shutdown(ctc context.Context) {
 
 func (s *Server) Handler(handler HttpHandler, middleWare ...MiddleWareOptions) HttpHandler {
 	return func(w http.ResponseWriter, r *http.Request) {
+		for key, value := range s.cors {
+			w.Header().Set(key, strings.Join(value, ""))
+		}
 		if len(middleWare) > 0 {
 			for _, mid := range middleWare {
 				if err := mid(s.ctx, s.logger, w, r); err != nil {
 					s.logger.LogErrorf("Lib::Handler()::received error::%+v", err.Error())
+					errorMessage := utils.BuildHttpError(err, "User unauthorized to access this page", r.UserAgent(), r.Host)
+					errorBytes, _ := utils.JsonMarshall(errorMessage)
 					w.WriteHeader(http.StatusUnauthorized)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					w.Write(errorBytes)
 					return
 				}
 			}
@@ -141,7 +226,6 @@ func (s *Server) Handler(handler HttpHandler, middleWare ...MiddleWareOptions) H
 }
 
 func (s *Server) Get(pattern string, handler HttpHandler, middleWare ...MiddleWareOptions) {
-	// s.logger.LogInfof("Server::Get()::received request on: %s, setting pattern: %s", pattern, fmt.Sprintf("%s %s", http.MethodGet, pattern))
 	s.mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodGet, pattern), s.Handler(handler, middleWare...))
 }
 
@@ -159,7 +243,7 @@ func (s *Server) Delete(pattern string, handler HttpHandler, middleWare ...Middl
 
 func (s *Server) ping() {
 	s.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get(types.USER_AGENT), "kube") {
+		if !strings.Contains(r.Header.Get(types.HEADER_USER_AGENT), "kube") {
 			s.logger.LogInfo(&logger.LoggerPayload{
 				Message: "Main::main()::received health check on",
 				Value: map[string]any{
