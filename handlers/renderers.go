@@ -17,7 +17,7 @@ func (rh *RequestHandler) RenderView(w http.ResponseWriter, r *http.Request, rou
 	}
 
 	ctxWithChildren := templ.WithChildren(r.Context(), children)
-	err := views.Index(routeData.Path, routeData.StyleSheet).Render(ctxWithChildren, w)
+	err := views.Index(routeData.Path, routeData.StyleSheet, routeData.JsFilePath).Render(ctxWithChildren, w)
 	rh.onError(w, r, err, "Internal server error", http.StatusInternalServerError)
 }
 

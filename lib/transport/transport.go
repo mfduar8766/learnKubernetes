@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
+	"github.com/mfduar8766/learnKubernetes/lib/models"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
 )
@@ -60,8 +62,8 @@ func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) erro
 	})
 
 	willPayload, err := utils.JsonMarshall(ServiceStatus{
+		Event:  SERVICE_STATUS,
 		Status: OFFLINE,
-		Event:  OFFLINE,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal LWT: %w", err)
@@ -99,17 +101,17 @@ func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) erro
 
 	b.logger.LogInfo(&logger.LoggerPayload{Message: "Connected to broker", Value: brokerConnection[types.MQTT_BROKER_URL]})
 
-	// willPayload, err = utils.JsonMarshall(ServiceStatus{
-	// 	Status: ONLINE,
-	// 	Event:  ONLINE,
-	// })
-	// if err != nil {
-	// 	return fmt.Errorf("failed to marshal LWT: %w", err)
-	// }
-	// b.Publish(ctx, fmt.Sprintf("%s/%s/status", API_VERSION, clientID), willPayload, &PublishRequest{
-	// 	QoS:    DEFAULT_QoS,
-	// 	Retain: true,
-	// })
+	willPayload, err = utils.JsonMarshall(ServiceStatus{
+		Event:  SERVICE_STATUS,
+		Status: ONLINE,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal LWT: %w", err)
+	}
+	b.Publish(ctx, fmt.Sprintf("%s/%s/status", API_VERSION, clientID), willPayload, &PublishRequest{
+		QoS:    DEFAULT_QoS,
+		Retain: true,
+	})
 	return nil
 }
 
@@ -228,7 +230,7 @@ func (b *Transport) Subscribe(ctx context.Context, topic string, properties *Sub
 		Subscriptions: []paho.SubscribeOptions{
 			{
 				Topic: topic,
-				QoS:   1,
+				QoS:   DEFAULT_QoS,
 			},
 		},
 	}
@@ -274,6 +276,56 @@ func (b *Transport) Unsubscribe(ctx context.Context, topics ...string) []string 
 	}
 
 	return failedTopics
+}
+
+func CheckTransportResponseForErrors[T any](
+	w http.ResponseWriter,
+	r *http.Request,
+	request *models.MessagePayload[T],
+	response Response,
+	ok bool,
+) error {
+	var err error
+	var statusCode int
+	var displayError string
+
+	if !ok {
+		statusCode = http.StatusInternalServerError
+		displayError = "Internal server error"
+		goto SEND_ERROR
+	}
+
+	if response.Error != nil {
+		statusCode = http.StatusInternalServerError
+		displayError = fmt.Sprintf("Service error: %v", response.Error)
+		err = response.Error
+		goto SEND_ERROR
+	}
+
+	if response.TimeOut {
+		statusCode = http.StatusGatewayTimeout
+		displayError = "Request timed out"
+		goto SEND_ERROR
+	}
+
+	if len(response.Payload) == 0 {
+		statusCode = http.StatusNoContent
+		displayError = "No data found"
+		goto SEND_ERROR
+	}
+
+	return nil
+
+SEND_ERROR:
+	w.WriteHeader(statusCode)
+	request.Error = utils.BuildHttpError(err, displayError, r.UserAgent(), r.Host)
+	errorBytes, err := request.Marshall()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+	w.Write(errorBytes)
+	return err
 }
 
 func (b *Transport) publish(ctx context.Context, topic string, payload []byte, properties *PublishRequest) (string, error) {
@@ -350,7 +402,7 @@ func (b *Transport) handleIncomingPublish(pr paho.PublishReceived) (bool, error)
 		return true, nil
 	}
 
-	// b.logger.LogInfo(&logger.LoggerPayload{
+	// b.logger.LogDebug(&logger.LoggerPayload{
 	// 	Message: "handleIncomingPublish()::Msg",
 	// 	Value: map[string]any{
 	// 		"Topic":          pr.Packet.Topic,
@@ -365,10 +417,10 @@ func (b *Transport) handleIncomingPublish(pr paho.PublishReceived) (bool, error)
 	if len(pr.Packet.Properties.CorrelationData) > 0 {
 		correlationID := string(pr.Packet.Properties.CorrelationData)
 		b.reqResLock.Lock()
-		responseTopicn := pr.Packet.Properties.User.Get(from)
+		responseTopic := pr.Packet.Properties.User.Get(from)
 
 		_, exists := b.pendingRequests[correlationID]
-		if exists && len(from) > 0 && len(pr.Packet.Properties.ResponseTopic) > 0 && pr.Packet.Properties.ResponseTopic == responseTopicn {
+		if exists && len(from) > 0 && len(pr.Packet.Properties.ResponseTopic) > 0 && pr.Packet.Properties.ResponseTopic == responseTopic {
 			b.requestResponseChan[correlationID] <- Response{
 				Payload:       pr.Packet.Payload,
 				Topic:         pr.Packet.Topic,

@@ -2,27 +2,22 @@ package redisDb
 
 import (
 	"context"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
+	"github.com/mfduar8766/learnKubernetes/lib/utils"
 	"github.com/redis/go-redis/v9"
 )
 
 func ConnectToRedis(ctx context.Context, log *logger.Logger) *redis.Client {
-	var (
-		redisHost     = "redis-service:6379"
-		redisPassword = "password"
-	)
-
-	if host := os.Getenv(types.REDIS_URL); len(host) == 0 {
-		log.LogErrorf("Redis::connectToRedis()::No redis host configured. Using default host instead")
+	connectionString, err := utils.CreateDbConnectionString(types.DB_REDIS, log)
+	if err != nil {
+		panic(err)
 	}
-	if password := os.Getenv(types.REDIS_PASSWORD); len(password) == 0 {
-		log.LogErrorf("Redis::connectToRedis()::No redis password configured. Using default password instead")
-	}
-
+	redisHost := connectionString[:strings.LastIndex(connectionString, "_")]
+	redisPassword := connectionString[strings.LastIndex(connectionString, "_")+1:]
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     redisHost,
 		Password: redisPassword,
@@ -32,10 +27,10 @@ func ConnectToRedis(ctx context.Context, log *logger.Logger) *redis.Client {
 		MinRetryBackoff: 8 * time.Millisecond,   // Minimum backoff between retries
 		MaxRetryBackoff: 512 * time.Millisecond, // Maximum backoff between retries
 	})
-	_, err := redisClient.Ping(ctx).Result()
+	_, err = redisClient.Ping(ctx).Result()
 	if err != nil {
 		log.LogErrorf("Redis::connectToRedis()::Failed to connect to Redis: %v", err.Error())
 	}
-	log.LogInfof("Redis::connectToRedis()::connected to redis:%+v", redisHost)
+	log.LogInfof("Redis::connectToRedis()::connected to redis on: %s", redisHost)
 	return redisClient
 }

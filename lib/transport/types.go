@@ -47,6 +47,7 @@ const (
 	QoS1                             = 1
 	QoS2                             = 2
 	DEFAULT_QoS                      = QoS1
+	SERVICE_STATUS                   = "serviceStatus"
 
 	topicEvent   = "event"
 	topicRequest = "request"
@@ -55,9 +56,13 @@ const (
 )
 
 var (
-	MESSAGE_EXPIRY        = new(uint32(30))
-	SESSION_EXPIRY        = new(uint32(60))
-	KEEP_ALIVE     uint16 = 60
+	// Default values for MQTT v5 Publish properties 30 seconds
+	MESSAGE_EXPIRY = new(uint32(30))
+	// Default session expiry interval for MQTT v5 is 0, which means the session never expires.
+	// Setting it to 60 seconds for better resource management.
+	SESSION_EXPIRY = new(uint32(60))
+	// Default keep alive interval for MQTT connections in seconds. Set to 60 seconds.
+	KEEP_ALIVE uint16 = 60
 )
 
 type TopicProperties struct {

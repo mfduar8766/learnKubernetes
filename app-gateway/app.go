@@ -21,8 +21,8 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
-	"github.com/mfduar8766/learnKubernetes/views"
 	"github.com/mfduar8766/learnKubernetes/views/common"
+	dashboard "github.com/mfduar8766/learnKubernetes/views/dashBoard"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -197,7 +197,8 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 
 	a.server.Get(handlers.DASH_BOARD_ROUTE, func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Received request for dashBoard: %+v\n", r.Header)
-		a.handler.RenderView(w, r, a.handler.GetRouteData(handlers.DASH_BOARD_ROUTE), views.Home())
+		// a.handler.RenderView(w, r, a.handler.GetRouteData(handlers.DASH_BOARD_ROUTE), views.Home())
+		a.handler.RenderView(w, r, a.handler.GetRouteData(handlers.DASH_BOARD_ROUTE), dashboard.DashBoard(nil))
 	}, httpServer.Auth)
 
 	wg.Go(func() {
@@ -209,9 +210,9 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 
 	a.log.LogInfo(&logger.LoggerPayload{
 		Message: "AppGateWay::Start()::Server is running on",
-		Value: map[string]string{
-			"host": "127.0.0.1",
-			"port": "3000",
+		Value: map[string]any{
+			"host": types.LOCAL_HOST,
+			"port": utils.GetHostPort(types.APP_GATE_WAY),
 		},
 	})
 

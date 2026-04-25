@@ -7,6 +7,17 @@ type ResponsePayloadResultsType string
 type ApplicationRoles ApplicationRolesType
 type ResponsePayloadResults ResponsePayloadResultsType
 
+type DbType int
+
+func (d DbType) String() string {
+	return [...]string{"Redis", "Mongo"}[d]
+}
+
+const (
+	DB_REDIS DbType = iota
+	DB_MONGO
+)
+
 const (
 	UNKNOWN    ApplicationRolesType = "UNKNOWN"
 	USER       ApplicationRolesType = "USER"
