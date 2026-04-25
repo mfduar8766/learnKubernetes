@@ -2,47 +2,21 @@ package mongoDb
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
+	"github.com/mfduar8766/learnKubernetes/lib/utils"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func ConnectToMongo(ctx context.Context, log *logger.Logger) (*mongo.Client, error) {
-	defaultHost := "mongo-service:27017"
-
-	user := os.Getenv(types.MONGO_INITDB_ROOT_USERNAME)
-	pass := os.Getenv(types.MONGO_INITDB_ROOT_PASSWORD)
-	host := os.Getenv(types.MONGO_HOST)
-	currentEnv := os.Getenv(types.CURRENT_ENV)
-
-	//TODO: FIX THIS AS ITS WRONG DEFAULT HOST IS NOT mongo-service:27017
-	if host == "" || user == "" || pass == "" {
-		log.LogWarnf("Mongo::ConnectToMongo()::Mongo env vars missing, using defaultHost: %s", defaultHost)
-		if host == "" {
-			host = defaultHost
-		}
-		if user == "" {
-			user = "user"
-		}
-		if pass == "" {
-			pass = "password"
-		}
+	mongoDSN, err := utils.CreateDbConnectionString(types.DB_MONGO, log)
+	if err != nil {
+		panic(err)
 	}
-
-	mongoDSN := fmt.Sprintf("mongodb://%s:%s@%s", user, pass, host)
-
-	if currentEnv != types.PROD_ENV {
-		mongoDSN = "mongodb://user:password@127.0.0.1:27017/?authSource=admin"
-	}
-
-	log.LogInfof("Mongo::ConnectToMongo()::Attempting Mongo connection: mongodb://%s:****@%s", user, host)
 
 	clientOptions := options.Client().ApplyURI(mongoDSN)
-
 	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
@@ -53,6 +27,6 @@ func ConnectToMongo(ctx context.Context, log *logger.Logger) (*mongo.Client, err
 		return nil, err
 	}
 
-	log.LogInfof("Mongo::ConnectToMongo()::Connected to MongoDB")
+	log.LogInfof("Mongo::ConnectToMongo()::Connected to MongoDB on: %s", mongoDSN)
 	return client, nil
 }

@@ -124,3 +124,51 @@ func GetBrokerConnection(tls bool) map[string]string {
 		types.MQTT_PASSWORD:   "password",
 	}
 }
+
+func CreateDbConnectionString(dbType types.DbType, log logger.ILogger) (string, error) {
+	var (
+		currentENV       = GetCurrentENV()
+		connectionString = ""
+	)
+	switch dbType {
+	case types.DB_REDIS:
+		if currentENV == types.PROD_ENV {
+			var (
+				redisHost     = "redis-service:6379"
+				redisPassword = "password"
+				host          = GetEnv(types.REDIS_URL)
+				password      = GetEnv(types.REDIS_PASSWORD)
+			)
+			if len(host) == 0 || len(password) == 0 {
+				log.LogWarnf("Utils::CreateDbConnectionString()::No redis host or password configured. Using default values instead")
+			}
+			connectionString = fmt.Sprintf("%s_%s", redisHost, redisPassword)
+		} else {
+			connectionString = fmt.Sprintf("%s:%d_%s", types.LOCAL_HOST, 6379, "password")
+		}
+	case types.DB_MONGO:
+		if currentENV == types.PROD_ENV {
+			k8sHost := "mongo-service:27017"
+			user := GetEnv(types.MONGO_INITDB_ROOT_USERNAME)
+			pass := GetEnv(types.MONGO_INITDB_ROOT_PASSWORD)
+			host := GetEnv(types.MONGO_HOST)
+
+			if host == "" {
+				host = k8sHost
+			}
+			if user == "" {
+				user = "user"
+			}
+			if pass == "" {
+				pass = "password"
+			}
+
+			connectionString = fmt.Sprintf("mongodb://%s:%s@%s", user, pass, host)
+		} else {
+			connectionString = "mongodb://user:password@127.0.0.1:27017/?authSource=admin"
+		}
+	default:
+		return "", fmt.Errorf("unsupported database type: %s", dbType.String())
+	}
+	return connectionString, nil
+}

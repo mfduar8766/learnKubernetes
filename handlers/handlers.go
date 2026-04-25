@@ -37,10 +37,8 @@ type RoutData struct {
 }
 
 type RequestHandler struct {
-	logger logger.ILogger
-	broker transport.ITransport
-	// queueNames    map[string]string
-	// exchangeNames map[string]string
+	logger        logger.ILogger
+	broker        transport.ITransport
 	ctx           httpServer.ICtx
 	subScribeLock sync.RWMutex
 	routes        map[string]*RoutData
@@ -51,21 +49,22 @@ func New(ctx httpServer.ICtx, broker transport.ITransport, log logger.ILogger) *
 	return &RequestHandler{
 		ctx:    ctx,
 		broker: broker,
-		// queueNames:    map[string]string{rmq.USERS_QUEUE: rmq.USERS_QUEUE, rmq.POSTS_QUEUE: rmq.POSTS_QUEUE},
-		// exchangeNames: map[string]string{rmq.USERS_EX: rmq.USERS_EX, rmq.POSTS_EX: rmq.POSTS_EX},
 		logger: log,
 		routes: map[string]*RoutData{
 			INDEX_ROUTE: {
 				Path:       INDEX_ROUTE,
 				StyleSheet: types.CSS_STYLE_PATH,
+				JsFilePath: types.JS_INDEX_PATH,
 			},
 			DASH_BOARD_ROUTE: {
 				Path:       DASH_BOARD_ROUTE,
 				StyleSheet: types.CSS_STYLE_PATH,
+				JsFilePath: types.JS_INDEX_PATH,
 			},
 			PAGE_NOT_FOUND_ROUTE: {
 				Path:       PAGE_NOT_FOUND_ROUTE,
 				StyleSheet: types.CSS_STYLE_PATH,
+				JsFilePath: types.JS_INDEX_PATH,
 			},
 		},
 		topics: map[string]string{
@@ -89,7 +88,7 @@ func (rh *RequestHandler) ProcessRequests(w http.ResponseWriter, r *http.Request
 	case string(events.LOGIN):
 		rh.handleLogIn(w, r)
 	case string(events.DASH_BOARD):
-		rh.RenderView(w, r, rh.routes[DASH_BOARD_ROUTE], views.Home())
+		// rh.RenderView(w, r, rh.routes[DASH_BOARD_ROUTE], views.Home())
 	case string(events.GET_POSTS):
 		rh.getPosts(w, r)
 	case string(events.GET_USERS):
@@ -137,57 +136,20 @@ func (rh *RequestHandler) handleLogIn(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusGatewayTimeout)
 		request.Error = utils.BuildHttpError(nil, "Request timedout", r.UserAgent(), r.Host)
 		errorBytes, err := request.Marshall()
-		utils.HandleError(err, "GetUsers()", "Request timedout. Failed to get response from users service...", rh.logger)
+		utils.HandleError(err, "handleLogIn()", "Request timedout. Failed to get response from users service...", rh.logger)
 		w.Write(errorBytes)
 		return
 	case response, ok := <-responseChan:
-		if !ok {
-			rh.logger.LogErrorf("Handlers::handleLogIn()::received error channel closed...")
-			w.WriteHeader(http.StatusInternalServerError)
-			request.Error = utils.BuildHttpError(err, "Error getting users", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "Error getting users. Failed to get response from users service...", rh.logger)
-			w.Write(errorBytes)
+		if err := transport.CheckTransportResponseForErrors(w, r, request, response, ok); err != nil {
+			utils.HandleError(err, "handleLogIn()", "failed logint", rh.logger)
 			return
 		}
-		if response.Error != nil {
-			rh.logger.LogErrorf("Handlers::handleLogIn()::received error: %+v", response.Error.Error())
-			w.WriteHeader(http.StatusInternalServerError)
-			request.Error = utils.BuildHttpError(err, "Error getting users", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "Error getting users. Failed to get response from users service...", rh.logger)
-			w.Write(errorBytes)
-			return
-		} else if response.TimeOut {
-			w.WriteHeader(http.StatusGatewayTimeout)
-			request.Error = utils.BuildHttpError(nil, "Request timedout", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "Request timedout. Failed to get response from users service...", rh.logger)
-			w.Write(errorBytes)
-			return
-		} else if response.Payload == nil {
-			w.WriteHeader(http.StatusNoContent)
-			request.Error = utils.BuildHttpError(nil, "no user data available", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "No user data available.", rh.logger)
-			w.Write(errorBytes)
-			return
-		} else if response.Payload != nil && len(response.Payload) == 0 {
-			w.WriteHeader(http.StatusNoContent)
-			request.Error = utils.BuildHttpError(nil, "Failed to get users. No data found.", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "Failed to get users. No data found.", rh.logger)
-			w.WriteHeader(http.StatusNoContent)
-			w.Write(errorBytes)
-			return
-		}
-
-		var users *models.MessagePayload[[]*models.UserModel] //[]*models.UserModel
+		var users *models.MessagePayload[[]*models.UserModel]
 		err = utils.JsonUnMarshall(response.Payload, &users)
 		if err != nil {
 			request.Error = utils.BuildHttpError(err, "failed to get users", r.UserAgent(), r.Host)
 			errorBytes, err := request.Marshall()
-			utils.HandleError(err, "GetUsers()", "failed to get users. Failed to get response from users service...", rh.logger)
+			utils.HandleError(err, "handleLogIn()", "failed to get users. Failed to get response from users service...", rh.logger)
 			w.WriteHeader(http.StatusNoContent)
 			w.Write(errorBytes)
 			return

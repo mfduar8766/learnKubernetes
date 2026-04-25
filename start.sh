@@ -202,3 +202,6 @@ fi
 
 echo "🔐 Starting Ingress Bridge on Port 80..."
 echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0
+
+# kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
+# http://myk8sapptest.com:8080/
