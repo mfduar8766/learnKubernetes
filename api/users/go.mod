@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/eclipse/paho.golang v0.23.0
-	github.com/mfduar8766/learnKubernetes/lib v0.0.0-00010101000000-000000000000
+	github.com/mfduar8766/learnKubernetes/lib v0.0.0
 	github.com/redis/go-redis/v9 v9.19.0
 	go.mongodb.org/mongo-driver/v2 v2.6.0
 )
@@ -54,7 +54,5 @@ tool (
 	github.com/a-h/templ/cmd/templ
 	github.com/air-verse/air
 )
-
-require github.com/mfduar8766/learnKubernetes/lib v0.0.0
 
 replace github.com/mfduar8766/learnKubernetes/lib => ../../lib

@@ -1,19 +1,54 @@
-FROM golang:1.26.2-alpine AS development
+# --- STAGE 1: Build ---
+FROM golang:1.26.2-alpine AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /src
 
-COPY go.mod go.sum ./
+# 1. Copy manifests for both lib and the users service to cache layers
+COPY lib/go.mod lib/go.sum ./lib/
+COPY api/users/go.mod api/users/go.sum ./api/users/
 
-RUN go mod download
+# 2. Download dependencies
+# This resolves your internal 'lib' dependency via the 'replace' in go.mod
+RUN cd api/users && go mod download && go mod verify
 
-COPY . .
+# 3. Copy the source code for the required modules
+COPY lib/ ./lib/
+COPY api/users/ ./api/users/
 
-RUN go vet ./...
+# 4. Run quality checks
+RUN cd api/users && go test ./... && go vet ./...
 
-RUN go test ./...
+# 5. Build the statically linked binary
+# We output it to a unique name: users-exe
+# RUN cd api/users && CGO_ENABLED=0 go build -v -o /users-exe .
+RUN cd api/users && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o /users-exe .
 
-# 1. Use a UNIQUE name for the output
-# 2. Point EXACTLY to the users main.go
-RUN CGO_ENABLED=0 go build -v -o /usr/local/bin/users-exe ./api/users
+# --- STAGE 2: Final Image ---
+FROM alpine:latest
 
-CMD ["/usr/local/bin/users-exe"]
+RUN apk --no-cache add ca-certificates
+
+# 1. Copy the binary
+COPY --from=builder /users-exe /users-exe
+
+# 2. Explicitly set permissions so it's not left to chance
+RUN chmod +x /users-exe
+
+WORKDIR /
+
+# 3. Use the absolute path to avoid any ambiguity
+ENTRYPOINT ["/users-exe"]
+
+# # --- STAGE 2: Final Image ---
+# FROM alpine:latest
+
+# # Basic security certificates
+# RUN apk --no-cache add ca-certificates
+
+# # Copy only the final binary
+# COPY --from=builder /users-exe /users-exe
+
+# WORKDIR /
+
+# # Run the users service
+# CMD ["./users-exe"]

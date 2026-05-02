@@ -19,7 +19,7 @@
 
 *.env.*
 
-Logs/**
+**/Logs/**
 
 *tailwindcss
 

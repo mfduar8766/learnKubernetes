@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/a-h/templ v0.3.1001
-	github.com/mfduar8766/learnKubernetes/lib v0.0.0-00010101000000-000000000000
+	github.com/mfduar8766/learnKubernetes/lib v0.0.0
 	github.com/redis/go-redis/v9 v9.19.0
 )
 
@@ -47,8 +47,6 @@ tool (
 	github.com/a-h/templ/cmd/templ
 	github.com/air-verse/air
 )
-
-require github.com/mfduar8766/learnKubernetes/lib v0.0.0
 
 // Replace the lib module with a local path for development purposes.
 //This allows go work to not treat this as a package and instead use

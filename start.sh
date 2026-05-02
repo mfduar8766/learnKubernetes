@@ -42,15 +42,12 @@ if ! minikube addons list | grep "ingress" | grep -v "ingress-dns" | grep -q "en
   minikube addons enable ingress
 fi
 
-# Use a variable for the command
 K8S_CMD="minikube kubectl --"
 GATE_WAY_IMG_NAME="gateway-app:v1"
 USERS_SERVICE_API_IMG_NAME="users-app:v1"
 MQTT_INIT_CONTAINER="mqtt-init-container-app:v1"
+MONGO_INIT_CONTAINER="mongo-init-container-app:v1"
 MY_APP_TEST="myk8sapptest.com"
-
-echo "Running templ to build before building docker image..."
-go tool templ generate ./...
 
 eval $(minikube docker-env)
 
@@ -62,7 +59,7 @@ $K8S_CMD delete deployment mqtt-deployment --ignore-not-found
 # Force remove the image from Minikube's Docker daemon
 docker rmi -f $MQTT_INIT_CONTAINER || true
 # Clean dangling layers to be sure
-docker system prune -f
+docker system prune -a -f
 
 echo "Sleeping for 10 seconds..."
 sleep 10
@@ -74,20 +71,25 @@ echo "⏳ Sleeping for 15 seconds..."
 sleep 15
 
 # =================================== Build Docker Containers ==================================================================
+# IMPORTANT: All builds must run from the ROOT (current directory) so Docker can see the /lib folder.
+
 echo "📦 Building MQTT Init Container: $MQTT_INIT_CONTAINER..."
-# $RANDOM ensures that every time you run this, Docker treats the apt-get line as brand new
-docker build --build-arg CACHEBUST=$RANDOM --no-cache -t $MQTT_INIT_CONTAINER -f mqttInitContainer/Dockerfile .
+# Point to the specific Dockerfile inside the initContainers folder
+docker build -t $MQTT_INIT_CONTAINER -f initContainers/mqttInitContainer/Dockerfile .
 
 echo "🔍 Verifying binary existence..."
-if ! docker run --rm $MQTT_INIT_CONTAINER ls /usr/bin/mosquitto_passwd >/dev/null 2>&1; then
-    echo "❌ ERROR: mosquitto_passwd NOT FOUND in image! Build failed logic."
+if ! docker run --rm $MQTT_INIT_CONTAINER ls /usr/local/bin/init-exe >/dev/null 2>&1; then
+    echo "❌ ERROR: init-exe NOT FOUND in image! Build failed logic."
     exit 1
 fi
 echo "✅ Binary confirmed. Proceeding with deployment..."
 
 echo "📦 Building GateWay: $GATE_WAY_IMG_NAME..."
-docker build -t $GATE_WAY_IMG_NAME .
+# Point to the app-gateway Dockerfile
+docker build -t $GATE_WAY_IMG_NAME -f app-gateway/Dockerfile .
+
 echo "📦 Building Users Service: $USERS_SERVICE_API_IMG_NAME..."
+# Point to the api/users Dockerfile
 docker build -t $USERS_SERVICE_API_IMG_NAME -f api/users/Dockerfile .
 # ===========================================================================================================================
 
