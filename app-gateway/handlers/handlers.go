@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mfduar8766/learnKubernetes/app-gateway/views"
+	dashboard "github.com/mfduar8766/learnKubernetes/app-gateway/views/dashBoard"
 	"github.com/mfduar8766/learnKubernetes/lib/events"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
@@ -16,8 +18,6 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
-	"github.com/mfduar8766/learnKubernetes/views"
-	dashboard "github.com/mfduar8766/learnKubernetes/views/dashBoard"
 )
 
 // Routes

@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/a-h/templ"
+	"github.com/mfduar8766/learnKubernetes/app-gateway/views"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
-	"github.com/mfduar8766/learnKubernetes/views"
 )
 
 func (rh *RequestHandler) RenderView(w http.ResponseWriter, r *http.Request, routeData *RoutData, children templ.Component) {

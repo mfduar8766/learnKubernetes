@@ -224,6 +224,16 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 	return responseChan
 }
 
+func (t *Transport) SubscribeMultiple(topics ...string) {
+	for _, topic := range topics {
+		t.Subscribe(context.Background(), topic, nil)
+	}
+}
+
+func (t *Transport) UnsubscribeMultiple(topics ...string) {
+	t.Unsubscribe(context.Background(), topics...)
+}
+
 func (b *Transport) Subscribe(ctx context.Context, topic string, properties *SubscribeProperties) error {
 	subscribeProperties := paho.Subscribe{
 		Properties: &paho.SubscribeProperties{},

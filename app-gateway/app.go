@@ -1,4 +1,4 @@
-package appgateway
+package main
 
 import (
 	"context"
@@ -9,20 +9,21 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/mfduar8766/learnKubernetes/handlers"
+	"github.com/mfduar8766/learnKubernetes/app-gateway/handlers"
+	"github.com/mfduar8766/learnKubernetes/app-gateway/views/common"
+	dashboard "github.com/mfduar8766/learnKubernetes/app-gateway/views/dashBoard"
 	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
-	"github.com/mfduar8766/learnKubernetes/views/common"
-	dashboard "github.com/mfduar8766/learnKubernetes/views/dashBoard"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -62,12 +63,23 @@ func New(ctx context.Context) func() *AppDeps {
 }
 
 func (a *AppDeps) setUpTailWind() {
+	var archSuffix string
+	switch runtime.GOARCH {
+	case "amd64":
+		archSuffix = "x64"
+	case "arm64":
+		archSuffix = "arm64"
+	default:
+		panic(fmt.Errorf("Main::setUpTailWind()::Failed to download tailwaind exe. Unsupported architecture: %s", runtime.GOARCH))
+	}
+	fileURL := fmt.Sprintf("https://github.com/tailwindlabs/tailwindcss/releases/download/v4.2.2/tailwindcss-%s-%s", runtime.GOOS, archSuffix)
 	var fileName = "tailwindcss"
 	if _, err := os.Stat(fileName); err != nil {
 		a.log.LogInfof("Main::setUpTailWind()::%s file does not exist. Downloading latest build...", fileName)
-		res, err := http.Get("https://github.com/tailwindlabs/tailwindcss/releases/download/v4.2.2/tailwindcss-linux-x64")
+		res, err := http.Get(fileURL)
 		if err != nil {
-			panic(err)
+			a.log.LogErrorf("Main::setUpTailWind()::Failed to download tailwind exe: %+v", err)
+			return
 		}
 		if res.StatusCode == http.StatusOK {
 			file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -97,8 +109,8 @@ func (a *AppDeps) launchTailWind() {
 	env := os.Getenv(types.CURRENT_ENV)
 
 	args := []string{
-		"-i", "public/css/index.css",
-		"-o", "public/css/style.css",
+		"-i", fmt.Sprintf("%s/css/index.css", types.PUBLIC),
+		"-o", fmt.Sprintf("%s/css/style.css", types.PUBLIC),
 		"--content", "views/**/*.templ",
 	}
 
@@ -157,7 +169,7 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 			return
 		}
 
-		if _, err := os.Stat("public/css/style.css"); os.IsNotExist(err) {
+		if _, err := os.Stat(fmt.Sprintf("%s/css/style.css", types.PUBLIC)); os.IsNotExist(err) {
 			a.log.LogErrorf("AppGateWay::Start()::tailWind is not ready yet err: %s", err.Error())
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprint(w, "CSS build in progress...")
@@ -178,7 +190,7 @@ func (a *AppDeps) Start(parentCtx context.Context) {
 
 	fileServer := http.FileServer(http.Dir("public"))
 	// IN LATEST Go WE CANNOT USE /public/*
-	a.server.Get("/public/{file...}", func(w http.ResponseWriter, r *http.Request) {
+	a.server.Get(fmt.Sprintf("/%s/{file...}", types.PUBLIC), func(w http.ResponseWriter, r *http.Request) {
 		a.log.LogInfof("Serving static file: %s", r.URL.Path)
 		http.StripPrefix("/public/", fileServer).ServeHTTP(w, r)
 	})

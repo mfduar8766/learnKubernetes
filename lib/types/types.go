@@ -57,6 +57,7 @@ const (
 	MQTT_BROKER_URL_TLS         = "MQTT_BROKER_URL_TLS"
 	MQTT_USER                   = "MQTT_USER"
 	MQTT_PASSWORD               = "MQTT_PASSWORD"
+	PUBLIC                      = "public"
 )
 
 const (
