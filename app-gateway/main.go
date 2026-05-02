@@ -1,15 +1,13 @@
-package main
+package appgateway
 
 import (
 	"context"
-
-	appgateway "github.com/mfduar8766/learnKubernetes/app-gateway"
 )
 
 func main() {
 	var (
-		ctx                     = context.Background()
-		app *appgateway.AppDeps = appgateway.New(ctx)()
+		ctx          = context.Background()
+		app *AppDeps = New(ctx)()
 	)
 	app.Start(ctx)
 }

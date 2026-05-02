@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/eclipse/paho.golang/paho"
-	"github.com/mfduar8766/learnKubernetes/handlers"
 	"github.com/mfduar8766/learnKubernetes/lib/db/mongoDb"
 	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
+
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
@@ -26,12 +26,11 @@ import (
 )
 
 type AppDeps struct {
-	server  httpServer.IServer
-	redis   *redis.Client
-	handler handlers.IRequestHandler
-	broker  transport.ITransport
-	log     logger.ILogger
-	mongo   *mongo.Client
+	server httpServer.IServer
+	redis  *redis.Client
+	broker transport.ITransport
+	log    logger.ILogger
+	mongo  *mongo.Client
 }
 
 func NewAppDeps(ctx context.Context) func() *AppDeps {
@@ -48,15 +47,13 @@ func NewAppDeps(ctx context.Context) func() *AppDeps {
 			panic(err)
 		}
 		srv := httpServer.New(ctx, log, utils.GetHostPort(types.APP_USERS_SERVICE))
-		handler := handlers.New(srv.GetCtx(), broker, log)
-		handler.Subscribe(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users")) //handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS
+		broker.SubscribeMultiple(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users")) //handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS
 		appDeps := AppDeps{
-			server:  srv,
-			redis:   redisClient,
-			handler: handler,
-			broker:  broker,
-			log:     log,
-			mongo:   mongoClient,
+			server: srv,
+			redis:  redisClient,
+			broker: broker,
+			log:    log,
+			mongo:  mongoClient,
 		}
 		return &appDeps
 	})
@@ -72,7 +69,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	defer func() {
-		app.handler.Unsubscribe(app.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), app.broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users"))
+		app.broker.UnsubscribeMultiple(app.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), app.broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users"))
 		err := app.broker.Close()
 		if err != nil {
 			app.log.LogErrorf("AppGateWay::Start()::Failed to disconnect from broker: %+v", err)
@@ -99,6 +96,7 @@ func main() {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
+
 	topic := app.broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users")
 	app.broker.RegisterHandler(topic, func(p *paho.Publish) {
 		app.log.LogInfof("Processing: %+v", map[string]any{

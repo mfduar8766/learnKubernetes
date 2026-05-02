@@ -1,5 +1,17 @@
 #!/bin/bash
 
+GO_WORK_FILE="go.work"
+
+if [[ ! -f "$GO_WORK_FILE" ]]; then
+  echo "Creating go.work file..."
+  # Initialize the workspace
+  go work init
+
+  # Add all modules to the workspace
+  go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
+  echo "Workspace initialized successfully."
+fi
+
 read -sp "Enter your sudo password: " MY_PASS
 echo "" # Just to move to a new line after typing
 

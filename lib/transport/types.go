@@ -11,8 +11,9 @@ type ITransport interface {
 	BuildTopic(topicType TOPIC_TYPE, domains ...string) string
 	GetTopicType(topic string) *TopicProperties
 	Close() error
+	SubscribeMultiple(topics ...string)
 	Subscribe(ctx context.Context, topic string, properties *SubscribeProperties) error
-
+	UnsubscribeMultiple(topics ...string)
 	// Unsubscribes from the topics and called UnregisterHandler for each topic.
 	//
 	// Returns a slice of errors corresponding to each topic taht was not unsubscribed.

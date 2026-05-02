@@ -14,15 +14,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mfduar8766/learnKubernetes/handlers"
+	"github.com/mfduar8766/learnKubernetes/app-gateway/handlers"
+	"github.com/mfduar8766/learnKubernetes/app-gateway/views/common"
+	dashboard "github.com/mfduar8766/learnKubernetes/app-gateway/views/dashBoard"
 	"github.com/mfduar8766/learnKubernetes/lib/db/redisDb"
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
-	"github.com/mfduar8766/learnKubernetes/views/common"
-	dashboard "github.com/mfduar8766/learnKubernetes/views/dashBoard"
 	"github.com/redis/go-redis/v9"
 )
 
