@@ -1,9 +1,11 @@
 package dashboard
 
-import "fmt"
-import "github.com/mfduar8766/learnKubernetes/lib/models"
+import (
+	"fmt"
+	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
+)
 
-templ DashBoard(users []*models.UserModel) {
+templ DashBoard(users []*protos.UserModel) {
 	if users == nil {
 		<div>Loading...</div>
 	}

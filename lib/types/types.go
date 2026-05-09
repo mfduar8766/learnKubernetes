@@ -2,11 +2,8 @@ package types
 
 import "fmt"
 
-type ApplicationRolesType string
 type ResponsePayloadResultsType string
-type ApplicationRoles ApplicationRolesType
 type ResponsePayloadResults ResponsePayloadResultsType
-
 type DbType int
 
 func (d DbType) String() string {
@@ -16,13 +13,6 @@ func (d DbType) String() string {
 const (
 	DB_REDIS DbType = iota
 	DB_MONGO
-)
-
-const (
-	UNKNOWN    ApplicationRolesType = "UNKNOWN"
-	USER       ApplicationRolesType = "USER"
-	ADMIN      ApplicationRolesType = "ADMIN"
-	SUPER_USER ApplicationRolesType = "SUPER_USER"
 )
 
 const (
@@ -58,6 +48,8 @@ const (
 	MQTT_USER                   = "MQTT_USER"
 	MQTT_PASSWORD               = "MQTT_PASSWORD"
 	PUBLIC                      = "public"
+	LOG_LEVEL                   = "LOG_LEVEL"
+	LOG_LEVEL_ENDPOINT          = "/log-level"
 )
 
 const (
@@ -65,6 +57,7 @@ const (
 	HEADER_USER_AGENT                        = "User-Agent"
 	HEADER_CONTENT_TYPE                      = "Content-Type"
 	HEADER_APPLICATION_JSON                  = "application/json"
+	HEADER_APPLICATION_PROTO                 = "application/x-protobuf"
 	HEADER_TOKEN                             = "Token"
 	HEADER_APPLICATION_CSS                   = "text/css"
 	HEADER_AUTHORIZATION                     = "Authorization"

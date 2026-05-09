@@ -2,10 +2,7 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -15,9 +12,11 @@ import (
 	"github.com/mfduar8766/learnKubernetes/lib/httpServer"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/models"
+	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
 	"github.com/mfduar8766/learnKubernetes/lib/transport"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
+	"google.golang.org/protobuf/proto"
 )
 
 // Routes
@@ -90,7 +89,7 @@ func (rh *RequestHandler) ProcessRequests(w http.ResponseWriter, r *http.Request
 	case string(events.DASH_BOARD):
 		// rh.RenderView(w, r, rh.routes[DASH_BOARD_ROUTE], views.Home())
 	case string(events.GET_POSTS):
-		rh.getPosts(w, r)
+		// rh.getPosts(w, r)
 	case string(events.GET_USERS):
 		rh.getUsers(w, r)
 	default:
@@ -118,8 +117,34 @@ func (rh *RequestHandler) handleLogIn(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*100)
 	defer cancel()
 
-	request := models.CreateNewMessagePayload[[]*models.UserModel](rh.topics[USERS_REQUESTS_TOPIC], events.UserEvents(events.GET_USERS), &models.Params{}, nil, nil)
-	requestBytes, err := request.Marshall()
+	// request := models.CreateNewMessagePayload[[]*models.UserModel](rh.topics[USERS_REQUESTS_TOPIC], events.UserEvents(events.GET_USERS), &models.Params{}, nil, nil)
+	// requestBytes, err := request.Marshall()
+	// if err != nil {
+	// 	rh.logger.LogError(&logger.LoggerPayload{
+	// 		Message: "Error marshalling message payload",
+	// 		Value:   err,
+	// 	})
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// request := protos.MessagePayload{
+	// 	Event:         string(events.UserEvents(events.GET_USERS)),
+	// 	Params:        nil,
+	// 	Response:      nil,
+	// 	Error:         nil,
+	// 	ResponseTopic: rh.topics[USERS_REQUESTS_TOPIC],
+	// }
+
+	request := models.CreateNewMessagePayload[*protos.UserList](
+		rh.topics[USERS_REQUESTS_TOPIC],
+		string(events.UserEvents(events.GET_USERS)),
+		&protos.Params{},
+		nil,
+		nil,
+	)
+	requestBytes, err := request.Marshal()
 	if err != nil {
 		rh.logger.LogError(&logger.LoggerPayload{
 			Message: "Error marshalling message payload",
@@ -135,7 +160,7 @@ func (rh *RequestHandler) handleLogIn(w http.ResponseWriter, r *http.Request) {
 	case <-ctx.Done():
 		w.WriteHeader(http.StatusGatewayTimeout)
 		request.Error = utils.BuildHttpError(nil, "Request timedout", r.UserAgent(), r.Host)
-		errorBytes, err := request.Marshall()
+		errorBytes, err := request.Marshal()
 		utils.HandleError(err, "handleLogIn()", "Request timedout. Failed to get response from users service...", rh.logger)
 		w.Write(errorBytes)
 		return
@@ -144,19 +169,32 @@ func (rh *RequestHandler) handleLogIn(w http.ResponseWriter, r *http.Request) {
 			utils.HandleError(err, "handleLogIn()", "failed logint", rh.logger)
 			return
 		}
-		var users *models.MessagePayload[[]*models.UserModel]
-		err = utils.JsonUnMarshall(response.Payload, &users)
+		var protoWrapper protos.MessagePayload
+		err = proto.Unmarshal(response.Payload, &protoWrapper)
 		if err != nil {
 			request.Error = utils.BuildHttpError(err, "failed to get users", r.UserAgent(), r.Host)
-			errorBytes, err := request.Marshall()
+			errorBytes, err := request.Marshal()
 			utils.HandleError(err, "handleLogIn()", "failed to get users. Failed to get response from users service...", rh.logger)
 			w.WriteHeader(http.StatusNoContent)
 			w.Write(errorBytes)
 			return
 		}
+
+		// 2. Unpack the "Any" data back into the concrete type (UserList)
+		userList := &protos.UserList{}
+		if err := protoWrapper.Response.Data.UnmarshalTo(userList); err != nil {
+			request.Error = utils.BuildHttpError(err, "failed to get users", r.UserAgent(), r.Host)
+			errorBytes, err := request.Marshal()
+			utils.HandleError(err, "handleLogIn()", "failed to get users. Failed to get response from users service...", rh.logger)
+			w.WriteHeader(http.StatusNoContent)
+			w.Write(errorBytes)
+			return
+		}
+
 		rh.ctx.SetCookies(w, types.HEADER_TOKEN, "SOME_VALUE")
+		w.Header().Set(types.HEADER_CONTENT_TYPE, types.HEADER_APPLICATION_HTML)
 		w.WriteHeader(http.StatusOK)
-		rh.RenderView(w, r, rh.routes[DASH_BOARD_ROUTE], dashboard.DashBoard(users.Response.Data))
+		rh.RenderView(w, r, rh.routes[DASH_BOARD_ROUTE], dashboard.DashBoard(userList.Users))
 	}
 }
 
@@ -192,32 +230,32 @@ func (rh *RequestHandler) getUsers(w http.ResponseWriter, r *http.Request) {
 	// w.Write(response.Payload)
 }
 
-func (rh *RequestHandler) getPosts(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set(types.HEADER_CONTENT_TYPE, types.HEADER_APPLICATION_JSON)
+// func (rh *RequestHandler) getPosts(w http.ResponseWriter, _ *http.Request) {
+// 	w.Header().Set(types.HEADER_CONTENT_TYPE, types.HEADER_APPLICATION_JSON)
 
-	postBytes, err := os.ReadFile("posts.json")
-	if err != nil {
-		http.Error(w, "File not found", http.StatusInternalServerError)
-		return
-	}
+// 	postBytes, err := os.ReadFile("posts.json")
+// 	if err != nil {
+// 		http.Error(w, "File not found", http.StatusInternalServerError)
+// 		return
+// 	}
 
-	var response models.Request[[]models.Posts]
-	err = json.Unmarshal(postBytes, &response.Body)
-	if err != nil {
-		http.Error(w, "Failed to parse JSON", http.StatusInternalServerError)
-		return
-	}
-	response.MetaData = map[string]any{
-		types.HEADER_TOKEN: rh.ctx.GetCtxValue(types.HEADER_TOKEN),
-	}
+// 	var response models.Request[[]models.Posts]
+// 	err = json.Unmarshal(postBytes, &response.Body)
+// 	if err != nil {
+// 		http.Error(w, "Failed to parse JSON", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	response.MetaData = map[string]any{
+// 		types.HEADER_TOKEN: rh.ctx.GetCtxValue(types.HEADER_TOKEN),
+// 	}
 
-	w.WriteHeader(http.StatusOK)
+// 	w.WriteHeader(http.StatusOK)
 
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		log.Printf("Failed to encode JSON: %v", err)
-	}
-}
+// 	err = json.NewEncoder(w).Encode(response)
+// 	if err != nil {
+// 		log.Printf("Failed to encode JSON: %v", err)
+// 	}
+// }
 
 func (rh *RequestHandler) Subscribe(topics ...string) {
 	for _, topic := range topics {

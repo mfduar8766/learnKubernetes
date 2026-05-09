@@ -24,3 +24,5 @@
 *tailwindcss
 
 go.work*
+
+lib/protos/generated/

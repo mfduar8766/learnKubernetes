@@ -48,7 +48,7 @@ func New(ctx context.Context) func() *AppDeps {
 		}
 		srv := httpServer.New(ctx, log, utils.GetHostPort(types.APP_GATE_WAY))
 		handler := handlers.New(srv.GetCtx(), broker, log)
-		handler.Subscribe(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users")) //handler.Subscribe(broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Request), broker.BuildTopic(rmq.USERS_EX, rmq.USERS_QUEUE, rmq.Events))
+		handler.Subscribe(broker.BuildTopic(transport.TOPIC_TYPE_REQUEST, "users"), broker.BuildTopic(transport.TOPIC_TYPE_EVENT, "users"))
 		appDeps := AppDeps{
 			server:  srv,
 			redis:   redisClient,

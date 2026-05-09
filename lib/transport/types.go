@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/eclipse/paho.golang/paho"
+	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
 )
 
 type ITransport interface {
@@ -27,7 +28,7 @@ type ITransport interface {
 	// MQTT v5 Request-Response Pattern
 	//
 	// Returns a read-only channel for the Response.
-	PublishWithResponse(ctx context.Context, topic string, payload []byte, properties *PublishRequest) <-chan Response
+	PublishWithResponse(ctx context.Context, topic string, payload []byte, properties *PublishRequest) <-chan *protos.BrokerResponse
 }
 
 type TOPIC_TYPE int
@@ -64,6 +65,8 @@ var (
 	SESSION_EXPIRY = new(uint32(60))
 	// Default keep alive interval for MQTT connections in seconds. Set to 60 seconds.
 	KEEP_ALIVE uint16 = 60
+	// Default payload format for MQTT v5 Publish properties. Set to bytes.
+	DEFAULT_PAYLOAD_FORMAT = paho.Byte(PAYLOAD_FORMAT_BYTES)
 )
 
 type TopicProperties struct {
@@ -103,13 +106,4 @@ type SubscribeProperties struct {
 	RetainAsPublished      bool
 	SubscriptionIdentifier *int
 	User                   paho.UserProperties
-}
-
-type Response struct {
-	Topic         string
-	ResponseTopic string
-	CorrelationID string
-	Payload       []byte
-	Error         error
-	TimeOut       bool
 }

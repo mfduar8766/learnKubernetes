@@ -8,6 +8,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.11.0
 	github.com/redis/go-redis/v9 v9.19.0
 	go.mongodb.org/mongo-driver/v2 v2.6.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (

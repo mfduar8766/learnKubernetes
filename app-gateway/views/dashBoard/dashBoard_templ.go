@@ -8,10 +8,12 @@ package dashboard
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "fmt"
-import "github.com/mfduar8766/learnKubernetes/lib/models"
+import (
+	"fmt"
+	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
+)
 
-func DashBoard(users []*models.UserModel) templ.Component {
+func DashBoard(users []*protos.UserModel) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -56,7 +58,7 @@ func DashBoard(users []*models.UserModel) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s %s", user.FirstName, user.LastName))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/dashBoard/dashBoard.templ`, Line: 16, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `app-gateway/views/dashBoard/dashBoard.templ`, Line: 18, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -69,7 +71,7 @@ func DashBoard(users []*models.UserModel) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(user.Age)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/dashBoard/dashBoard.templ`, Line: 17, Col: 22}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `app-gateway/views/dashBoard/dashBoard.templ`, Line: 19, Col: 22}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {

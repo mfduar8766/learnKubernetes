@@ -1,5 +1,38 @@
 #!/bin/bash
 
+read -sp "Enter your sudo password: " MY_PASS
+echo "" # Just to move to a new line after typing
+
+echo "Executing get_protos.sh to install protoc and Go plugins..."
+chmod +x ./get_protos.sh
+./get_protos.sh
+
+echo "Update all go modules..."
+
+cd ./lib
+echo "Running go mod tidy in lib package..."
+go mod tidy
+cd protos/
+echo "Running build.sh in protos package to generate Go code from .proto files..."
+chmod +x build.sh
+./build.sh
+cd ../..
+
+cd ./api/users
+echo "Running go mod tidy in user service package..."
+go mod tidy
+cd ..
+
+cd ../../app-gateway
+echo "Running go mod tidy in app-gateway package..."
+go mod tidy
+cd ..
+
+cd ../initContainers/mqttInitContainer
+echo "Running go mod tidy in mqttInitContainer package..."
+go mod tidy 
+cd ../../
+
 GO_WORK_FILE="go.work"
 
 if [[ ! -f "$GO_WORK_FILE" ]]; then
@@ -11,9 +44,6 @@ if [[ ! -f "$GO_WORK_FILE" ]]; then
   go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
   echo "Workspace initialized successfully."
 fi
-
-read -sp "Enter your sudo password: " MY_PASS
-echo "" # Just to move to a new line after typing
 
 MINI_KUBE_WAIT_START_TIME=5
 
@@ -186,7 +216,6 @@ echo "⏳ Waiting for Users to be ready..."
 $K8S_CMD rollout status deployment users-deployment --timeout=60s
 
 MINI_IP="127.0.0.1"
-
 echo "🔍 Checking host mapping for webApp..."
 if ! grep -q "$MY_APP_TEST" /etc/hosts; then
     echo "Adding $MY_APP_TEST to /etc/hosts..."
@@ -201,12 +230,11 @@ echo "✅ Done! Application should be at http://$MY_APP_TEST"
 
 echo "🧹 Cleaning up existing port-forwards..."
 # The [p] trick prevents the script from killing its own pkill command
-echo "$MY_PASS" | sudo -S pkill -9 -f "[p]ort-forward" || true
+echo "$MY_PASS" | sudo -S pkill -15 -f "[p]ort-forward" || echo "No processes found to clean."
 sleep 2
 
 # Get ONLY the name of the MQTT pod
 BROKER_POD=$($K8S_CMD get pods -l app=mqtt -o jsonpath='{.items[0].metadata.name}')
-
 if [ -z "$BROKER_POD" ]; then
     echo "❌ ERROR: MQTT Pod not found. Cannot port-forward."
 else
@@ -214,8 +242,12 @@ else
     echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward "$BROKER_POD" 1883:1883 --address 0.0.0.0 &
 fi
 
-echo "🔐 Starting Ingress Bridge on Port 80..."
-echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0
+chmod +x ./port-forward.sh
+echo "🔐 Starting Port-Forwarding for all services..."
+./port-forward.sh
+
+# echo "🔐 Starting Ingress Bridge on Port 80..."
+# echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0
 
 # kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
 # http://myk8sapptest.com:8080/

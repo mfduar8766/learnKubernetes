@@ -7,10 +7,22 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"syscall"
 	"time"
 )
 
+/*
+INFO = 0
+
+WARNING = 1
+
+DEBUG = 2
+
+ERROR = 3
+
+FATAL = 4
+*/
 type LogLevel int8
 
 const (
@@ -22,19 +34,7 @@ const (
 )
 
 func (l LogLevel) String() string {
-	switch l {
-	case info:
-		return "info"
-	case warning:
-		return "warning"
-	case debug:
-		return "debug"
-	case error:
-		return "error"
-	case fatal:
-		return "fatal"
-	}
-	return ""
+	return [...]string{"INFO", "WARNING", "DEBUG", "ERROR", "FATAL"}[l]
 }
 
 func (l LogLevel) GetIndex() int8 {
@@ -65,6 +65,7 @@ type Logger struct {
 	file          *os.File
 	terminateChan chan bool
 	mask          []string
+	logLevel      LogLevel
 }
 
 func getDate() string {
@@ -84,7 +85,8 @@ func NewLogger(serviceName string) *Logger {
 			Source: serviceName,
 			Time:   date,
 		},
-		mask: make([]string, 0),
+		mask:     make([]string, 0),
+		logLevel: LogLevel(0),
 	}
 	logger.file = logger.createDir()
 	return logger
@@ -127,12 +129,35 @@ func (l *Logger) Close() {
 	}
 }
 
+func (l *Logger) SetLogLevel(level string) {
+	switch strings.ToUpper(level) {
+	case LogLevel(0).String():
+		l.logLevel = LogLevel(0)
+	case LogLevel(1).String():
+		l.logLevel = LogLevel(1)
+	case LogLevel(2).String():
+		l.logLevel = LogLevel(2)
+	case LogLevel(3).String():
+		l.logLevel = LogLevel(3)
+	case LogLevel(4).String():
+		l.logLevel = LogLevel(4)
+	default:
+		l.LogErrorf("Invalid log level: %s", level)
+	}
+}
+
 func (l *Logger) LogInfo(payload *LoggerPayload) {
+	if !l.isLogLevelAllowed(0) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(0), payload)
 }
 
 func (l *Logger) LogInfof(format string, a ...any) {
+	if !l.isLogLevelAllowed(0) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(0), &LoggerPayload{
 		Message: fmt.Sprintf(format, a...),
@@ -140,11 +165,17 @@ func (l *Logger) LogInfof(format string, a ...any) {
 }
 
 func (l *Logger) LogWarning(payload *LoggerPayload) {
+	if !l.isLogLevelAllowed(1) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(1), payload)
 }
 
 func (l *Logger) LogWarnf(format string, a ...any) {
+	if !l.isLogLevelAllowed(1) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(1), &LoggerPayload{
 		Message: fmt.Sprintf(format, a...),
@@ -152,16 +183,35 @@ func (l *Logger) LogWarnf(format string, a ...any) {
 }
 
 func (l *Logger) LogDebug(payload *LoggerPayload) {
+	if !l.isLogLevelAllowed(2) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(2), payload)
 }
 
+func (l *Logger) LogDebugf(format string, a ...any) {
+	if !l.isLogLevelAllowed(2) {
+		return
+	}
+	defer l.writeToFile()
+	l.setLoggerData(LogLevel.String(2), &LoggerPayload{
+		Message: fmt.Sprintf(format, a...),
+	})
+}
+
 func (l *Logger) LogError(payload *LoggerPayload) {
+	if !l.isLogLevelAllowed(3) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(3), payload)
 }
 
 func (l *Logger) LogErrorf(format string, a ...any) {
+	if !l.isLogLevelAllowed(3) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(3), &LoggerPayload{
 		Message: fmt.Sprintf(format, a...),
@@ -169,11 +219,17 @@ func (l *Logger) LogErrorf(format string, a ...any) {
 }
 
 func (l *Logger) LogFatal(payload *LoggerPayload) {
+	if !l.isLogLevelAllowed(4) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(4), payload)
 }
 
 func (l *Logger) LogFatalf(format string, a ...any) {
+	if !l.isLogLevelAllowed(4) {
+		return
+	}
 	defer l.writeToFile()
 	l.setLoggerData(LogLevel.String(4), &LoggerPayload{
 		Message: fmt.Sprintf(format, a...),
@@ -220,4 +276,8 @@ func (l *Logger) writeToFile() {
 	l.loggerMessage.Message = ""
 	l.loggerMessage.FileName = ""
 	l.loggerMessage.Method = ""
+}
+
+func (l *Logger) isLogLevelAllowed(level LogLevel) bool {
+	return l.logLevel.GetIndex() == level.GetIndex()
 }

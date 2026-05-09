@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
+	"github.com/mfduar8766/learnKubernetes/lib/models"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
 )
@@ -150,6 +151,7 @@ func New(ctx context.Context, logger logger.ILogger, addr int) *Server {
 		},
 	}
 	s.ping()
+	s.setLogLevel()
 	return &s
 }
 
@@ -254,5 +256,39 @@ func (s *Server) ping() {
 			})
 		}
 		w.WriteHeader(http.StatusOK)
+	})
+}
+
+func (s Server) setLogLevel() {
+	s.Post(types.LOG_LEVEL_ENDPOINT, func(w http.ResponseWriter, r *http.Request) {
+		var logLevelReq models.LogLevelRequest
+		reqBytes, err := utils.ReadRequestBody(r)
+		if err != nil {
+			s.logger.LogErrorf("Lib::setLogLevel()::error reading request body::%+v", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			errorMessage := utils.BuildHttpError(err, "Invalid request body", r.UserAgent(), r.Host)
+			errorBytes, _ := utils.JsonMarshall(errorMessage)
+			w.Write(errorBytes)
+			return
+		}
+		err = logLevelReq.UnMarshal(reqBytes)
+		if err != nil {
+			s.logger.LogErrorf("Lib::setLogLevel()::error unmarshalling request body::%+v", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			errorMessage := utils.BuildHttpError(err, "Invalid request body", r.UserAgent(), r.Host)
+			errorBytes, _ := utils.JsonMarshall(errorMessage)
+			w.Write(errorBytes)
+			return
+		}
+		s.logger.SetLogLevel(logLevelReq.LogLevel)
+
+		var response models.LogLevelResponse = models.LogLevelResponse{
+			Result:   types.ResponsePayloadResults(types.SUCCESS),
+			LogLevel: logLevelReq.LogLevel,
+		}
+		responseBytes, _ := utils.JsonMarshall(response)
+		w.Header().Set(types.HEADER_CONTENT_TYPE, types.HEADER_APPLICATION_JSON)
+		w.WriteHeader(http.StatusOK)
+		w.Write(responseBytes)
 	})
 }
