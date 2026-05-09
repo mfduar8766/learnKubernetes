@@ -104,7 +104,7 @@ func main() {
 			"payload":       string(p.Payload),
 			"responseTopic": p.Properties.ResponseTopic,
 		})
-		response, err := users.GetUsers()
+		response, err := users.GetUsers(p.Properties.ResponseTopic)
 		utils.HandleError(err, "main()", "Error getting users...", app.log)
 		if err != nil {
 			return

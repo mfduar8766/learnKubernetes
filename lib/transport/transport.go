@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,16 +13,19 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/models"
+	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
+	"google.golang.org/protobuf/proto"
 )
 
 type Transport struct {
-	client              *paho.Client
-	logger              logger.ILogger
-	router              *paho.StandardRouter
-	pendingRequests     map[string]string
-	requestResponseChan map[string]chan Response
+	client          *paho.Client
+	logger          logger.ILogger
+	router          *paho.StandardRouter
+	pendingRequests map[string]string
+	// ProtoBuf MUST be a * because the internal code has Mutexes.
+	requestResponseChan map[string]chan *protos.BrokerResponse
 	reqResLock          sync.RWMutex
 	topicAliasLock      sync.RWMutex
 	topicAliasMap       map[string]string
@@ -32,7 +36,7 @@ func New(log logger.ILogger) *Transport {
 		logger:              log,
 		router:              paho.NewStandardRouter(),
 		pendingRequests:     make(map[string]string),
-		requestResponseChan: make(map[string]chan Response),
+		requestResponseChan: make(map[string]chan *protos.BrokerResponse),
 		topicAliasMap:       make(map[string]string),
 	}
 }
@@ -164,8 +168,8 @@ func (b *Transport) Publish(ctx context.Context, topic string, payload []byte, p
 	return b.publish(ctx, topic, payload, properties)
 }
 
-func (b *Transport) PublishWithResponse(ctx context.Context, topic string, payload []byte, properties *PublishRequest) <-chan Response {
-	var responseChan chan Response = make(chan Response, 1)
+func (b *Transport) PublishWithResponse(ctx context.Context, topic string, payload []byte, properties *PublishRequest) <-chan *protos.BrokerResponse {
+	var responseChan chan *protos.BrokerResponse = make(chan *protos.BrokerResponse, 1)
 	var wg sync.WaitGroup
 
 	if properties == nil {
@@ -174,8 +178,8 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 			Topic: topic,
 			QoS:   DEFAULT_QoS,
 			Properties: &PublishProperties{
-				ContentType:     types.HEADER_APPLICATION_JSON,
-				PayloadFormat:   paho.Byte(PAYLOAD_FORMAT_UTF_8),
+				ContentType:     types.HEADER_APPLICATION_PROTO,
+				PayloadFormat:   DEFAULT_PAYLOAD_FORMAT,
 				MessageExpiry:   MESSAGE_EXPIRY,
 				CorrelationData: []byte(responseID),
 			},
@@ -184,15 +188,15 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 	if properties != nil && properties.Properties == nil {
 		responseID := utils.NewUUID()
 		properties.Properties = &PublishProperties{
-			ContentType:     types.HEADER_APPLICATION_JSON,
-			PayloadFormat:   paho.Byte(PAYLOAD_FORMAT_UTF_8),
+			ContentType:     types.HEADER_APPLICATION_PROTO,
+			PayloadFormat:   DEFAULT_PAYLOAD_FORMAT,
 			MessageExpiry:   MESSAGE_EXPIRY,
 			CorrelationData: []byte(responseID),
 		}
 	}
 
 	corID := string(properties.Properties.CorrelationData)
-	waitCh := make(chan Response, 1)
+	waitCh := make(chan *protos.BrokerResponse, 1)
 	b.reqResLock.Lock()
 	b.requestResponseChan[corID] = waitCh
 	b.reqResLock.Unlock()
@@ -207,13 +211,13 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 
 		_, err := b.publish(ctx, topic, payload, properties)
 		if err != nil {
-			responseChan <- Response{Error: err}
+			responseChan <- &protos.BrokerResponse{Error: err.Error()} //protos.BrokerResponse{Error: err}
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			responseChan <- Response{TimeOut: true, Error: ctx.Err()}
+			responseChan <- &protos.BrokerResponse{TimeOut: true, Error: ctx.Err().Error()}
 		case res, ok := <-waitCh:
 			if ok {
 				responseChan <- res
@@ -288,11 +292,11 @@ func (b *Transport) Unsubscribe(ctx context.Context, topics ...string) []string 
 	return failedTopics
 }
 
-func CheckTransportResponseForErrors[T any](
+func CheckTransportResponseForErrors[T proto.Message](
 	w http.ResponseWriter,
 	r *http.Request,
 	request *models.MessagePayload[T],
-	response Response,
+	response *protos.BrokerResponse,
 	ok bool,
 ) error {
 	var err error
@@ -305,10 +309,10 @@ func CheckTransportResponseForErrors[T any](
 		goto SEND_ERROR
 	}
 
-	if response.Error != nil {
+	if len(response.Error) > 0 {
 		statusCode = http.StatusInternalServerError
 		displayError = fmt.Sprintf("Service error: %v", response.Error)
-		err = response.Error
+		err = errors.New(response.Error)
 		goto SEND_ERROR
 	}
 
@@ -329,13 +333,24 @@ func CheckTransportResponseForErrors[T any](
 SEND_ERROR:
 	w.WriteHeader(statusCode)
 	request.Error = utils.BuildHttpError(err, displayError, r.UserAgent(), r.Host)
-	errorBytes, err := request.Marshall()
+	errorBytes, err := request.Marshal()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return err
 	}
 	w.Write(errorBytes)
 	return err
+}
+
+func CreatePayloadFormat(contentType uint8) *byte {
+	switch contentType {
+	case PAYLOAD_FORMAT_BYTES:
+		return paho.Byte(PAYLOAD_FORMAT_BYTES)
+	case PAYLOAD_FORMAT_UTF_8:
+		return paho.Byte(PAYLOAD_FORMAT_UTF_8)
+	default:
+		return DEFAULT_PAYLOAD_FORMAT
+	}
 }
 
 func (b *Transport) publish(ctx context.Context, topic string, payload []byte, properties *PublishRequest) (string, error) {
@@ -347,8 +362,8 @@ func (b *Transport) publish(ctx context.Context, topic string, payload []byte, p
 		QoS:     DEFAULT_QoS,
 		Retain:  false,
 		Properties: &paho.PublishProperties{
-			ContentType:   types.HEADER_APPLICATION_JSON,
-			PayloadFormat: paho.Byte(PAYLOAD_FORMAT_UTF_8),
+			ContentType:   types.HEADER_APPLICATION_PROTO,
+			PayloadFormat: DEFAULT_PAYLOAD_FORMAT,
 			MessageExpiry: MESSAGE_EXPIRY,
 		},
 	}
@@ -431,10 +446,10 @@ func (b *Transport) handleIncomingPublish(pr paho.PublishReceived) (bool, error)
 
 		_, exists := b.pendingRequests[correlationID]
 		if exists && len(from) > 0 && len(pr.Packet.Properties.ResponseTopic) > 0 && pr.Packet.Properties.ResponseTopic == responseTopic {
-			b.requestResponseChan[correlationID] <- Response{
+			b.requestResponseChan[correlationID] <- &protos.BrokerResponse{
 				Payload:       pr.Packet.Payload,
 				Topic:         pr.Packet.Topic,
-				CorrelationID: correlationID,
+				CorrelationId: correlationID,
 				ResponseTopic: pr.Packet.Properties.ResponseTopic,
 			}
 			close(b.requestResponseChan[correlationID])

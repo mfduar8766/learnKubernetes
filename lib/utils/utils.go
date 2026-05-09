@@ -3,6 +3,8 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -171,4 +173,13 @@ func CreateDbConnectionString(dbType types.DbType, log logger.ILogger) (string, 
 		return "", fmt.Errorf("unsupported database type: %s", dbType.String())
 	}
 	return connectionString, nil
+}
+
+func ReadRequestBody(r *http.Request) ([]byte, error) {
+	defer r.Body.Close()
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	return bodyBytes, nil
 }

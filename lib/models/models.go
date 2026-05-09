@@ -3,54 +3,104 @@ package models
 import (
 	"encoding/json"
 
-	"github.com/mfduar8766/learnKubernetes/lib/events"
+	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type Posts struct {
-	UserID int    `json:"userId"`
-	ID     int    `json:"id"`
-	Title  string `json:"title"`
-	Body   string `json:"body"`
+type ResponsePayloadParams[T proto.Message] struct {
+	Result protos.ResponsePayloadResults
+	Data   T
 }
 
-type ResponsePayloadParams[T any] struct {
-	Result types.ResponsePayloadResults `json:"result"`
-	Data   T                            `json:"data"`
+type MessagePayload[T proto.Message] struct {
+	Event         string
+	Params        *protos.Params
+	Response      *ResponsePayloadParams[T]
+	Error         map[string]any
+	ResponseTopic string
 }
 
-type MessagePayload[T any] struct {
-	Event    events.UserEventsType `json:"event"`
-	*Params  `json:"params,omitempty"`
-	Response *ResponsePayloadParams[T] `json:"response,omitempty"`
-	Error    map[string]any            `json:"error,omitempty"`
-	Topic    string                    `json:"topic"`
-}
-
-func CreateNewMessagePayload[T any](topic string, event events.UserEvents, params *Params, response *ResponsePayloadParams[T], errorMessage map[string]interface{}) *MessagePayload[T] {
+func CreateNewMessagePayload[T proto.Message](
+	responseTopic string,
+	event string,
+	params *protos.Params,
+	response *ResponsePayloadParams[T],
+	errorMessage map[string]interface{},
+) *MessagePayload[T] {
 	return &MessagePayload[T]{
-		Event:    events.UserEventsType(event),
-		Params:   params,
-		Response: response,
-		Error:    errorMessage,
-		Topic:    topic,
+		Event:         event,
+		Params:        params,
+		Response:      response,
+		Error:         errorMessage,
+		ResponseTopic: responseTopic,
 	}
 }
 
-func (m *MessagePayload[T]) Marshall() ([]byte, error) {
-	messageBytes, err := json.Marshal(m)
-	return messageBytes, err
+func (m *MessagePayload[T]) ToProto() (*protos.MessagePayload, error) {
+	var anyData *anypb.Any = nil
+	var err error
+	var response *protos.ResponsePayload = nil
+
+	// 1. Pack the generic Data into the Any field
+	if m.Response != nil && any(m.Response.Data) != nil {
+		anyData, err = anypb.New(m.Response.Data)
+		if err != nil {
+			return nil, err
+		}
+		response = &protos.ResponsePayload{
+			Result: m.Response.Result,
+			Data:   anyData,
+		}
+	}
+
+	// 2. Convert Error map to Struct
+	errStruct, err := structpb.NewStruct(m.Error)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Map everything to the generated Proto struct
+	return &protos.MessagePayload{
+		Event:         m.Event,
+		Params:        m.Params,
+		ResponseTopic: m.ResponseTopic,
+		Response:      response,
+		Error:         errStruct,
+	}, nil
 }
 
-type Request[T any] struct {
-	MetaData map[string]any `json:"metaData"`
-	Body     T              `json:"body"`
+func (m *MessagePayload[T]) Marshal() ([]byte, error) {
+	protoMsg, err := m.ToProto()
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(protoMsg)
 }
 
-func (r *Request[T]) Marshal() ([]byte, error) {
-	return json.Marshal(r)
+type LogLevelRequest struct {
+	LogLevel string `json:"level" required:"true"`
 }
 
-func (r *Request[T]) UnMarshal(data []byte) error {
-	return json.Unmarshal(data, r)
+func (l *LogLevelRequest) Marshal() ([]byte, error) {
+	return json.Marshal(l)
+}
+
+func (l *LogLevelRequest) UnMarshal(data []byte) error {
+	return json.Unmarshal(data, l)
+}
+
+type LogLevelResponse struct {
+	Result   types.ResponsePayloadResults `json:"result"`
+	LogLevel string                       `json:"level" required:"true"`
+}
+
+func (l *LogLevelResponse) Marshal() ([]byte, error) {
+	return json.Marshal(l)
+}
+
+func (l *LogLevelResponse) UnMarshal(data []byte) error {
+	return json.Unmarshal(data, l)
 }

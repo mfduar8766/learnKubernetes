@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package protos;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/mfduar8766/learnKubernetes/lib/protos";
+
+// --- ENUMS ---
+
+enum ApplicationRoles {
+  ROLE_UNKNOWN = 0;
+  ROLE_USER = 1;
+  ROLE_ADMIN = 2;
+  ROLE_SUPER_USER = 3;
+}
+
+enum ResponsePayloadResults {
+  RESULTS_UNKNOWN = 0;
+  RESULTS_SUCCESS = 1;
+  RESULTS_INTERNAL_SERVER_ERROR = 2;
+  RESULTS_NOT_FOUND = 3;
+  RESULTS_RESOURCE_IN_USE = 4;
+}
+
+// A list of users to use as a generic in my CreatePayload function, since proto doesn't support generics, we can use this as a workaround
+message UserList {
+  repeated UserModel users = 1;
+}
+
+// --- CORE MODELS ---
+
+message UserModel {
+  optional string id = 1; // optional handles the *string pointer
+  string user_name = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string email = 5;
+  int32 age = 6;         // proto3 doesn't have int8, use int32
+  string password = 7;
+  repeated ApplicationRoles roles = 8;
+  string created_at = 9;
+  string updated_at = 10;
+  string activation_code = 11;
+}
+
+message UserMessagePayloadParams {
+  string id = 1;
+  repeated string ids_to_delete = 2;
+}
+
+message Params {
+  // Wrapping optional fields in a message or using optional
+  UserMessagePayloadParams user_message_payload = 1;
+}
+
+message ResponsePayload {
+  ResponsePayloadResults result = 1;
+
+  // This replaces ResponsePayloadParams[T] with a truly generic field
+  google.protobuf.Any data = 2; 
+}
+
+message MessagePayload {
+  string event = 1; 
+  Params params = 2;
+  ResponsePayload response = 3;
+  google.protobuf.Struct error = 4; 
+  string response_topic = 5;
+}
+
+message Request {
+  google.protobuf.Struct meta_data = 1;
+  // This replaces Request[T]
+  oneof body {
+    UserModel user = 2;
+    UserMessagePayloadParams user_params = 3;
+    google.protobuf.Value generic_body = 4;
+  }
+}
+
+message BrokerResponse {
+  string topic = 1;
+  string response_topic = 2;
+  string correlation_id = 3;
+  bytes payload = 4;
+  string error = 5;      // In Proto, we typically pass the error message as a string
+  bool time_out = 6;
+}
