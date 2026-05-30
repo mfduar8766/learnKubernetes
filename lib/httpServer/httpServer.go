@@ -20,10 +20,12 @@ type HttpHandler func(http.ResponseWriter, *http.Request)
 type HttpHandlerFunc map[string]func(handler HttpHandler, middleWare ...MiddleWareOptions) HttpHandler
 type Routes map[string]string
 type SetOptions func(*Server)
+
 type ReturnCtxWithCancel struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
+
 type ReturnCtx struct {
 	Ctx context.Context
 }

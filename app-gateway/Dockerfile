@@ -3,7 +3,7 @@ FROM golang:1.26.2-alpine AS builder
 
 WORKDIR /src
 
-ARG TAIL_WIND_VRSION="v4.2.2"
+ARG TAIL_WIND_VRSION=4.2.2
 
 # 1. Copy manifests
 COPY lib/go.mod lib/go.sum ./lib/
@@ -17,7 +17,7 @@ COPY lib/ ./lib/
 COPY app-gateway/ ./app-gateway/
 
 # 4. Tailwind CLI - For CSS generation
-ADD https://github.com/tailwindlabs/tailwindcss/releases/download/${TAIL_WIND_VERSION}/tailwindcss-linux-x64 ./tailwindcss
+ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
 RUN chmod +x ./tailwindcss
 
 # 5. Protobuf Generation
@@ -25,12 +25,14 @@ RUN apk add --no-cache protoc
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-RUN chmod +x ./lib/protos/build.sh
-RUN ./lib/protos/build.sh
+# RUN chmod +x ./lib/protos/build.sh
+# RUN ./lib/protos/build.sh
 
 # 6. Templ Generation
 RUN go install github.com/a-h/templ/cmd/templ@latest
 RUN cd app-gateway && go tool templ generate ./...
+
+RUN cd app-gateway && go test ./... && go vet ./...
 
 # 7. Build - Using amd64 to match your working Users service
 RUN cd app-gateway && \

@@ -49,6 +49,8 @@ spec: # DEPLOYMENT SPEFICICATIONS
               value: "PROD"
             - name: HOST_PORT
               value: "3000"
+            - name: LOG_LEVEL
+              value: "info"
 
           # 1. Is the app alive? (If no, restart it)
           # httpGet: Hits an endpoint. A response code between 200–399 is a "success." (STANDARD)

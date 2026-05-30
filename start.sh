@@ -7,31 +7,8 @@ echo "Executing get_protos.sh to install protoc and Go plugins..."
 chmod +x ./get_protos.sh
 ./get_protos.sh
 
-echo "Update all go modules..."
-
-cd ./lib
-echo "Running go mod tidy in lib package..."
-go mod tidy
-cd protos/
-echo "Running build.sh in protos package to generate Go code from .proto files..."
-chmod +x build.sh
-./build.sh
-cd ../..
-
-cd ./api/users
-echo "Running go mod tidy in user service package..."
-go mod tidy
-cd ..
-
-cd ../../app-gateway
-echo "Running go mod tidy in app-gateway package..."
-go mod tidy
-cd ..
-
-cd ../initContainers/mqttInitContainer
-echo "Running go mod tidy in mqttInitContainer package..."
-go mod tidy 
-cd ../../
+chmod +x ./updateGoWork.sh
+./updateGoWork.sh
 
 GO_WORK_FILE="go.work"
 
@@ -233,18 +210,18 @@ echo "🧹 Cleaning up existing port-forwards..."
 echo "$MY_PASS" | sudo -S pkill -15 -f "[p]ort-forward" || echo "No processes found to clean."
 sleep 2
 
-# Get ONLY the name of the MQTT pod
-BROKER_POD=$($K8S_CMD get pods -l app=mqtt -o jsonpath='{.items[0].metadata.name}')
-if [ -z "$BROKER_POD" ]; then
-    echo "❌ ERROR: MQTT Pod not found. Cannot port-forward."
-else
-    echo "🔐 Starting Broker on Port 1883 for pod: $BROKER_POD"
-    echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward "$BROKER_POD" 1883:1883 --address 0.0.0.0 &
-fi
+# # Get ONLY the name of the MQTT pod
+# BROKER_POD=$($K8S_CMD get pods -l app=mqtt -o jsonpath='{.items[0].metadata.name}')
+# if [ -z "$BROKER_POD" ]; then
+#     echo "❌ ERROR: MQTT Pod not found. Cannot port-forward."
+# else
+#     echo "🔐 Starting Broker on Port 1883 for pod: $BROKER_POD"
+#     echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward "$BROKER_POD" 1883:1883 --address 0.0.0.0 &
+# fi
 
 chmod +x ./port-forward.sh
 echo "🔐 Starting Port-Forwarding for all services..."
-./port-forward.sh
+./port-forward.sh "$MY_PASS"
 
 # echo "🔐 Starting Ingress Bridge on Port 80..."
 # echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0
