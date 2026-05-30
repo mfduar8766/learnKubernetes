@@ -210,21 +210,9 @@ echo "🧹 Cleaning up existing port-forwards..."
 echo "$MY_PASS" | sudo -S pkill -15 -f "[p]ort-forward" || echo "No processes found to clean."
 sleep 2
 
-# # Get ONLY the name of the MQTT pod
-# BROKER_POD=$($K8S_CMD get pods -l app=mqtt -o jsonpath='{.items[0].metadata.name}')
-# if [ -z "$BROKER_POD" ]; then
-#     echo "❌ ERROR: MQTT Pod not found. Cannot port-forward."
-# else
-#     echo "🔐 Starting Broker on Port 1883 for pod: $BROKER_POD"
-#     echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward "$BROKER_POD" 1883:1883 --address 0.0.0.0 &
-# fi
-
 chmod +x ./port-forward.sh
 echo "🔐 Starting Port-Forwarding for all services..."
 ./port-forward.sh "$MY_PASS"
-
-# echo "🔐 Starting Ingress Bridge on Port 80..."
-# echo "$MY_PASS" | sudo -S -E $K8S_CMD port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0
 
 # kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
 # http://myk8sapptest.com:8080/
