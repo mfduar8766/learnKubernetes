@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/models"
@@ -73,6 +74,9 @@ func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) erro
 		return fmt.Errorf("failed to marshal LWT: %w", err)
 	}
 
+	protocolErr := packets.ConnackProtocolError
+	fmt.Printf("PROTO: %+v\n", protocolErr)
+
 	connack, err := b.client.Connect(ctx, &paho.Connect{
 		KeepAlive:    KEEP_ALIVE,
 		CleanStart:   true,
@@ -82,7 +86,19 @@ func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) erro
 		UsernameFlag: true,
 		PasswordFlag: true,
 		Properties: &paho.ConnectProperties{
-			SessionExpiryInterval: SESSION_EXPIRY,
+			SessionExpiryInterval: &SESSION_EXPIRY,
+			RequestResponseInfo:   true,
+			// THIS IS CAUSING THE BROKER TO NOT CONNECT. THIS IS BC CLEAN_START IS TRUE,
+			// MEANING THE CLIENT IS NOT ALLOWING THE BROKER TO STORE THE LWT FOR WHEN IT DISCONNECTS.
+			// THIS SHOULD BE FINE FOR OUR USE CASE BUT IF YOU WANT TO USE LWT WITH CLEAN_START TRUE,
+			// YOU NEED TO SET A WILL_DELAY_INTERVAL IN THE CONNECT PROPERTIES AND SET IT TO A VALUE
+			//  LOWER THAN THE SESSION_EXPIRY_INTERVAL CONFIGURED IN THE BROKER (mosquitto.conf) SO
+			// THAT THE BROKER KNOWS TO WAIT THAT AMOUNT OF TIME BEFORE PUBLISHING THE LWT ON DISCONNECTION.
+			// THIS WAY, IF THE CLIENT RECONNECTS WITHIN THAT TIME FRAME, THE BROKER WILL NOT PUBLISH THE
+			// LWT AND WILL DELETE IT INSTEAD.
+			// WillDelayInterval:     &WILL_DELAY_INTERVAL,
+			RequestProblemInfo: true,
+			TopicAliasMaximum:  &MAX_TOPIC_ALIAS,
 		},
 		WillProperties: &paho.WillProperties{
 			PayloadFormat: paho.Byte(PAYLOAD_FORMAT_UTF_8),
@@ -180,7 +196,7 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 			Properties: &PublishProperties{
 				ContentType:     types.HEADER_APPLICATION_PROTO,
 				PayloadFormat:   DEFAULT_PAYLOAD_FORMAT,
-				MessageExpiry:   MESSAGE_EXPIRY,
+				MessageExpiry:   &MESSAGE_EXPIRY,
 				CorrelationData: []byte(responseID),
 			},
 		}
@@ -190,7 +206,7 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 		properties.Properties = &PublishProperties{
 			ContentType:     types.HEADER_APPLICATION_PROTO,
 			PayloadFormat:   DEFAULT_PAYLOAD_FORMAT,
-			MessageExpiry:   MESSAGE_EXPIRY,
+			MessageExpiry:   &MESSAGE_EXPIRY,
 			CorrelationData: []byte(responseID),
 		}
 	}
@@ -364,7 +380,7 @@ func (b *Transport) publish(ctx context.Context, topic string, payload []byte, p
 		Properties: &paho.PublishProperties{
 			ContentType:   types.HEADER_APPLICATION_PROTO,
 			PayloadFormat: DEFAULT_PAYLOAD_FORMAT,
-			MessageExpiry: MESSAGE_EXPIRY,
+			MessageExpiry: &MESSAGE_EXPIRY,
 		},
 	}
 	if strings.Contains(topic, "request/") {

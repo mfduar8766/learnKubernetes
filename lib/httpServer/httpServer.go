@@ -20,10 +20,12 @@ type HttpHandler func(http.ResponseWriter, *http.Request)
 type HttpHandlerFunc map[string]func(handler HttpHandler, middleWare ...MiddleWareOptions) HttpHandler
 type Routes map[string]string
 type SetOptions func(*Server)
+
 type ReturnCtxWithCancel struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
+
 type ReturnCtx struct {
 	Ctx context.Context
 }
@@ -280,6 +282,16 @@ func (s Server) setLogLevel() {
 			w.Write(errorBytes)
 			return
 		}
+
+		if len(logLevelReq.LogLevel) == 0 {
+			s.logger.LogErrorf("Lib::setLogLevel()::error logLevel cannot be empty::%+v", logLevelReq.LogLevel)
+			w.WriteHeader(http.StatusBadRequest)
+			errorMessage := utils.BuildHttpError(err, "Invalid request body", r.UserAgent(), r.Host)
+			errorBytes, _ := utils.JsonMarshall(errorMessage)
+			w.Write(errorBytes)
+			return
+		}
+
 		s.logger.SetLogLevel(logLevelReq.LogLevel)
 
 		var response models.LogLevelResponse = models.LogLevelResponse{

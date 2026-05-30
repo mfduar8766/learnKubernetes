@@ -70,7 +70,7 @@ func BuildHttpError(err error, message, agent, host string) map[string]any {
 }
 
 func GetCurrentENV() string {
-	return os.Getenv(types.CURRENT_ENV)
+	return GetEnv(types.CURRENT_ENV)
 }
 
 func GetHostPort(serviceName string) int {
@@ -175,6 +175,7 @@ func CreateDbConnectionString(dbType types.DbType, log logger.ILogger) (string, 
 	return connectionString, nil
 }
 
+// TODO: Update this to actually read the request body
 func ReadRequestBody(r *http.Request) ([]byte, error) {
 	defer r.Body.Close()
 	bodyBytes, err := io.ReadAll(r.Body)

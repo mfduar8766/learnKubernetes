@@ -10,6 +10,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/mfduar8766/learnKubernetes/lib/types"
 )
 
 /*
@@ -68,15 +70,133 @@ type Logger struct {
 	logLevel      LogLevel
 }
 
-func getDate() string {
-	return time.Now().UTC().Format("2006-01-02:15:04:05.000")
+var logger *Logger = nil
+
+func LogInfo(payload *LoggerPayload) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(0) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(0), payload)
+}
+
+func LogInfof(format string, a ...any) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(0) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(0), &LoggerPayload{
+		Message: fmt.Sprintf(format, a...),
+	})
+}
+
+func LogWarning(payload *LoggerPayload) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(1) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(1), payload)
+}
+
+func LogWarnf(format string, a ...any) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(1) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(1), &LoggerPayload{
+		Message: fmt.Sprintf(format, a...),
+	})
+}
+
+func LogDebug(payload *LoggerPayload) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(2) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(2), payload)
+}
+
+func LogDebugf(format string, a ...any) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(2) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(2), &LoggerPayload{
+		Message: fmt.Sprintf(format, a...),
+	})
+}
+
+func LogError(payload *LoggerPayload) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(3) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(3), payload)
+}
+
+func LogErrorf(format string, a ...any) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(3) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(3), &LoggerPayload{
+		Message: fmt.Sprintf(format, a...),
+	})
+}
+
+func LogFatal(payload *LoggerPayload) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(4) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(4), payload)
+}
+
+func LogFatalf(format string, a ...any) {
+	if logger == nil {
+		return
+	}
+	if !logger.isLogLevelAllowed(4) {
+		return
+	}
+	defer logger.writeToFile()
+	logger.setLoggerData(LogLevel.String(4), &LoggerPayload{
+		Message: fmt.Sprintf(format, a...),
+	})
 }
 
 func NewLogger(serviceName string) *Logger {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	var date = time.Now().Local().UTC().String()
-	var logger *Logger = &Logger{
+	logger = &Logger{
 		date:          date,
 		serviceName:   serviceName,
 		terminateChan: make(chan bool, 1),
@@ -86,7 +206,7 @@ func NewLogger(serviceName string) *Logger {
 			Time:   date,
 		},
 		mask:     make([]string, 0),
-		logLevel: LogLevel(0),
+		logLevel: getLogLevel(),
 	}
 	logger.file = logger.createDir()
 	return logger
@@ -279,5 +399,35 @@ func (l *Logger) writeToFile() {
 }
 
 func (l *Logger) isLogLevelAllowed(level LogLevel) bool {
-	return l.logLevel.GetIndex() == level.GetIndex()
+	if level.GetIndex() >= l.logLevel.GetIndex() {
+		return true
+	}
+	return false
+}
+
+func getLogLevel() LogLevel {
+	logLevelEnv := strings.TrimSpace(os.Getenv(types.LOG_LEVEL))
+	var logLevel LogLevel = LogLevel(0)
+
+	if len(logLevelEnv) > 0 {
+		switch logLevelEnv {
+		case LogLevel(0).String():
+			return LogLevel(0)
+		case LogLevel(1).String():
+			return LogLevel(1)
+		case LogLevel(2).String():
+			return LogLevel(2)
+		case LogLevel(3).String():
+			return LogLevel(3)
+		case LogLevel(4).String():
+			return LogLevel(4)
+		default:
+			return LogLevel(0)
+		}
+	}
+	return logLevel
+}
+
+func getDate() string {
+	return time.Now().UTC().Format("2006-01-02:15:04:05.000")
 }

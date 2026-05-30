@@ -15,10 +15,18 @@ RUN cd api/users && go mod download && go mod verify
 COPY lib/ ./lib/
 COPY api/users/ ./api/users/
 
-# 4. Run quality checks
+# 4. Protobuf Generation
+RUN apk add --no-cache protoc
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# RUN chmod +x ./lib/protos/build.sh
+# RUN ./lib/protos/build.sh
+
+# 5. Run quality checks
 RUN cd api/users && go test ./... && go vet ./...
 
-# 5. Build the statically linked binary
+# 6. Build the statically linked binary
 # We output it to a unique name: users-exe
 # RUN cd api/users && CGO_ENABLED=0 go build -v -o /users-exe .
 RUN cd api/users && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o /users-exe .
