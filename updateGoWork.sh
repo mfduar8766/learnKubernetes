@@ -21,17 +21,17 @@ echo "Running go mod tidy in app-gateway package..."
 go mod tidy
 cd ..
 
-cd ./initContainers/mqttInitContainer/
+cd ./initContainers/mqtt/
 echo "Running go mod tidy in mqttInitContainer package..."
 go mod tidy 
 cd ../../
 
-cd ./initContainers/mongoInit/
+cd ./initContainers/mongo/
 echo "Running go mod tidy in mongoInitContainer package..."
 go mod tidy
 cd ../../
 
-cd ./broker
+cd ./proxy/
 echo "Running go mod tidy in broker package..."
 go mod tidy
 cd ..

@@ -103,29 +103,61 @@ func GetEnv(env string) string {
 	return strings.TrimSpace(os.Getenv(env))
 }
 
-func GetBrokerConnection(tls bool) map[string]string {
-	currentENV := GetCurrentENV()
-	if currentENV == types.PROD_ENV {
-		brokerURL := GetEnv(types.MQTT_BROKER_URL)
-		if tls {
-			brokerURL = GetEnv(types.MQTT_BROKER_URL_TLS)
-		}
+func GetBrokerConnection(clientID string, tls bool) map[string]string {
+	// currentENV := GetCurrentENV()
+	// if currentENV == types.PROD_ENV {
+	// 	brokerURL := GetEnv(types.MQTT_BROKER_URL)
+	// 	if tls {
+	// 		brokerURL = GetEnv(types.MQTT_BROKER_URL_TLS)
+	// 	}
 
-		brokerUser := GetEnv(types.MQTT_USER)
-		brokerPassword := GetEnv(types.MQTT_PASSWORD)
-		return map[string]string{
-			types.MQTT_BROKER_URL: brokerURL,
-			types.MQTT_USER:       brokerUser,
-			types.MQTT_PASSWORD:   brokerPassword,
-		}
-
+	// 	brokerUser := GetEnv(types.MQTT_USER)
+	// 	brokerPassword := GetEnv(types.MQTT_PASSWORD)
+	// 	return map[string]string{
+	// 		types.MQTT_BROKER_URL: brokerURL,
+	// 		types.MQTT_USER:       brokerUser,
+	// 		types.MQTT_PASSWORD:   brokerPassword,
+	// 	}
+	// }
+	// return map[string]string{
+	// 	types.MQTT_BROKER_URL: "0.0.0.0:1883",
+	// 	types.MQTT_USER:       "user",
+	// 	types.MQTT_PASSWORD:   "password",
+	// }
+	var brokerConnectionMap map[string]string = map[string]string{
+		types.MQTT_USER:     "user",
+		types.MQTT_PASSWORD: "password",
 	}
-	return map[string]string{
-		types.MQTT_BROKER_URL: "localhost:1883",
-		types.MQTT_USER:       "user",
-		types.MQTT_PASSWORD:   "password",
+	if clientID == "client1" {
+		brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
 	}
+	if clientID == "client2" {
+		brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
+	}
+	return brokerConnectionMap
 }
+
+// func GetBrokerConnection(clientID string, isInternalBridge bool) map[string]string {
+// 	var brokerConnectionMap map[string]string = map[string]string{
+// 		types.MQTT_USER:     "user",
+// 		types.MQTT_PASSWORD: "password",
+// 	}
+
+// 	// If Mochi itself is running this to connect to the backends:
+// 	if isInternalBridge {
+// 		switch clientID {
+// 		case "client1":
+// 			brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1884" // Mosquitto 1
+// 		case "client2":
+// 			brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1885" // Mosquitto 2
+// 		}
+// 		return brokerConnectionMap
+// 	}
+
+// 	// Edge clients calling this always point to Mochi's front door
+// 	brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
+// 	return brokerConnectionMap
+// }
 
 func CreateDbConnectionString(dbType types.DbType, log logger.ILogger) (string, error) {
 	var (

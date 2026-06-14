@@ -9,6 +9,8 @@ import (
 
 type ITransport interface {
 	Connect(ctx context.Context, clientID string, tls bool) error
+	Client() *paho.Client
+	IsConnectted() bool
 	BuildTopic(topicType TOPIC_TYPE, domains ...string) string
 	GetTopicType(topic string) *TopicProperties
 	Close() error

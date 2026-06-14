@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eclipse/paho.golang/packets"
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/models"
 	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
+	mPackets "github.com/mochi-mqtt/server/v2/packets"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,6 +30,7 @@ type Transport struct {
 	reqResLock          sync.RWMutex
 	topicAliasLock      sync.RWMutex
 	topicAliasMap       map[string]string
+	isConnected         bool
 }
 
 func New(log logger.ILogger) *Transport {
@@ -42,97 +43,236 @@ func New(log logger.ILogger) *Transport {
 	}
 }
 
+// func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) error {
+// 	brokerConnection := utils.GetBrokerConnection(clientID, tls)
+// 	b.logger.LogInfo(&logger.LoggerPayload{Message: "Connecting to broker", Value: map[string]string{
+// 		"brokerURL": brokerConnection[types.MQTT_BROKER_URL],
+// 		"user":      brokerConnection[types.MQTT_USER],
+// 		"password":  brokerConnection[types.MQTT_PASSWORD],
+// 	}})
+// 	dialer := net.Dialer{Timeout: 10 * time.Second}
+// 	conn, err := dialer.DialContext(ctx, "tcp", brokerConnection[types.MQTT_BROKER_URL])
+// 	if err != nil {
+// 		b.logger.LogErrorf("Failed to connect to broker at %s: %v", brokerConnection[types.MQTT_BROKER_URL], err)
+// 		return fmt.Errorf("network dial failed: %w", err)
+// 	}
+
+// 	b.client = paho.NewClient(paho.ClientConfig{
+// 		Conn: conn,
+// 		OnPublishReceived: []func(paho.PublishReceived) (bool, error){
+// 			b.handleIncomingPublish,
+// 		},
+// 		OnClientError:      b.onError,
+// 		OnServerDisconnect: b.onServerDisconnect,
+// 	})
+
+// 	willPayload, err := utils.JsonMarshall(ServiceStatus{
+// 		Event:  SERVICE_STATUS,
+// 		Status: OFFLINE,
+// 	})
+// 	if err != nil {
+// 		return fmt.Errorf("failed to marshal LWT: %w", err)
+// 	}
+
+// 	protocolErr := packets.ConnackProtocolError
+// 	fmt.Printf("PROTO: %+v\n", protocolErr)
+
+// 	connack, err := b.client.Connect(ctx, &paho.Connect{
+// 		KeepAlive:    KEEP_ALIVE,
+// 		CleanStart:   true,
+// 		Username:     brokerConnection[types.MQTT_USER],
+// 		Password:     []byte(brokerConnection[types.MQTT_PASSWORD]),
+// 		ClientID:     clientID,
+// 		UsernameFlag: true,
+// 		PasswordFlag: true,
+// 		Properties: &paho.ConnectProperties{
+// 			SessionExpiryInterval: &SESSION_EXPIRY,
+// 			RequestResponseInfo:   true,
+// 			// THIS IS CAUSING THE BROKER TO NOT CONNECT. THIS IS BC CLEAN_START IS TRUE,
+// 			// MEANING THE CLIENT IS NOT ALLOWING THE BROKER TO STORE THE LWT FOR WHEN IT DISCONNECTS.
+// 			// THIS SHOULD BE FINE FOR OUR USE CASE BUT IF YOU WANT TO USE LWT WITH CLEAN_START TRUE,
+// 			// YOU NEED TO SET A WILL_DELAY_INTERVAL IN THE CONNECT PROPERTIES AND SET IT TO A VALUE
+// 			//  LOWER THAN THE SESSION_EXPIRY_INTERVAL CONFIGURED IN THE BROKER (mosquitto.conf) SO
+// 			// THAT THE BROKER KNOWS TO WAIT THAT AMOUNT OF TIME BEFORE PUBLISHING THE LWT ON DISCONNECTION.
+// 			// THIS WAY, IF THE CLIENT RECONNECTS WITHIN THAT TIME FRAME, THE BROKER WILL NOT PUBLISH THE
+// 			// LWT AND WILL DELETE IT INSTEAD.
+// 			// WillDelayInterval:     &WILL_DELAY_INTERVAL,
+// 			RequestProblemInfo: true,
+// 			TopicAliasMaximum:  &MAX_TOPIC_ALIAS,
+// 		},
+// 		WillProperties: &paho.WillProperties{
+// 			PayloadFormat: paho.Byte(PAYLOAD_FORMAT_UTF_8),
+// 			ContentType:   types.HEADER_APPLICATION_JSON,
+// 		},
+// 		WillMessage: &paho.WillMessage{
+// 			Topic:   fmt.Sprintf("%s/%s/status", API_VERSION, clientID),
+// 			Payload: willPayload,
+// 			QoS:     DEFAULT_QoS,
+// 			Retain:  true,
+// 		},
+// 	})
+
+// 	if err != nil {
+// 		return fmt.Errorf("mqtt connect failed: %w", err)
+// 	}
+
+// 	fmt.Printf("CONNACK_CODE: %+v\n", connack.ReasonCode)
+// 	fmt.Printf("ERR: %+v\n", mPackets.ErrServerMoved)
+
+// 	// --- REDIRECTION HANDLING ENGINE ---
+// 	if connack.ReasonCode == mPackets.ErrServerMoved.Code || connack.ReasonCode == mPackets.ErrServerBusy.Code {
+// 		if connack.Properties != nil && connack.Properties.ServerReference != "" {
+// 			newServer := connack.Properties.ServerReference
+// 			b.logger.LogInfo(&logger.LoggerPayload{
+// 				Message: "Server redirected client",
+// 				Value:   map[string]string{"RedirectedTo": newServer},
+// 			})
+
+// 			// Clean up the current network socket
+// 			conn.Close()
+// 		}
+// 		conn.Close()
+// 		return fmt.Errorf("server sent redirection code %x but omitted ServerReference", connack.ReasonCode)
+// 	}
+
+// 	if connack.ReasonCode != 0 {
+// 		return fmt.Errorf("broker rejected connection (Reason Code: %d)", connack.ReasonCode)
+// 	}
+
+// 	b.isConnected = true
+// 	b.logger.LogInfo(&logger.LoggerPayload{Message: "Connected to broker", Value: brokerConnection[types.MQTT_BROKER_URL]})
+
+// 	willPayload, err = utils.JsonMarshall(ServiceStatus{
+// 		Event:  SERVICE_STATUS,
+// 		Status: ONLINE,
+// 	})
+// 	if err != nil {
+// 		return fmt.Errorf("failed to marshal LWT: %w", err)
+// 	}
+// 	b.Publish(ctx, fmt.Sprintf("%s/%s/status", API_VERSION, clientID), willPayload, &PublishRequest{
+// 		QoS:    DEFAULT_QoS,
+// 		Retain: true,
+// 	})
+// 	return nil
+// }
+
 func (b *Transport) Connect(ctx context.Context, clientID string, tls bool) error {
-	brokerConnection := utils.GetBrokerConnection(tls)
-	b.logger.LogInfo(&logger.LoggerPayload{Message: "Connecting to broker", Value: map[string]string{
-		"brokerURL": brokerConnection[types.MQTT_BROKER_URL],
-		"user":      brokerConnection[types.MQTT_USER],
-		"password":  brokerConnection[types.MQTT_PASSWORD],
-	}})
+	brokerConnection := utils.GetBrokerConnection(clientID, tls)
 
-	dialer := net.Dialer{Timeout: 10 * time.Second}
-	conn, err := dialer.DialContext(ctx, "tcp", brokerConnection[types.MQTT_BROKER_URL])
-	if err != nil {
-		b.logger.LogErrorf("Failed to connect to broker at %s: %v", brokerConnection[types.MQTT_BROKER_URL], err)
-		return fmt.Errorf("network dial failed: %w", err)
+	// Start with whatever URL your utility gives you
+	targetURL := brokerConnection[types.MQTT_BROKER_URL]
+
+	// Allow a few redirection hops
+	for attempts := 0; attempts < 3; attempts++ {
+		b.logger.LogInfo(&logger.LoggerPayload{Message: "Connecting to broker", Value: map[string]string{
+			"brokerURL": targetURL,
+			"user":      brokerConnection[types.MQTT_USER],
+		}})
+
+		dialer := net.Dialer{Timeout: 10 * time.Second}
+		conn, err := dialer.DialContext(ctx, "tcp", targetURL)
+		if err != nil {
+			return fmt.Errorf("network dial failed to %s: %w", targetURL, err)
+		}
+
+		b.client = paho.NewClient(paho.ClientConfig{
+			Conn: conn,
+			OnPublishReceived: []func(paho.PublishReceived) (bool, error){
+				b.handleIncomingPublish,
+			},
+			OnClientError:      b.onError,
+			OnServerDisconnect: b.onServerDisconnect,
+		})
+
+		willPayload, err := utils.JsonMarshall(ServiceStatus{
+			Event:  SERVICE_STATUS,
+			Status: OFFLINE,
+		})
+		if err != nil {
+			conn.Close()
+			return fmt.Errorf("failed to marshal LWT: %w", err)
+		}
+
+		connack, err := b.client.Connect(ctx, &paho.Connect{
+			KeepAlive:    KEEP_ALIVE,
+			CleanStart:   true,
+			Username:     brokerConnection[types.MQTT_USER],
+			Password:     []byte(brokerConnection[types.MQTT_PASSWORD]),
+			ClientID:     clientID,
+			UsernameFlag: true,
+			PasswordFlag: true,
+			Properties: &paho.ConnectProperties{
+				SessionExpiryInterval: &SESSION_EXPIRY,
+				RequestResponseInfo:   true,
+				// THIS IS CAUSING THE BROKER TO NOT CONNECT. THIS IS BC CLEAN_START IS TRUE,
+				// MEANING THE CLIENT IS NOT ALLOWING THE BROKER TO STORE THE LWT FOR WHEN IT DISCONNECTS.
+				// THIS SHOULD BE FINE FOR OUR USE CASE BUT IF YOU WANT TO USE LWT WITH CLEAN_START TRUE,
+				// YOU NEED TO SET A WILL_DELAY_INTERVAL IN THE CONNECT PROPERTIES AND SET IT TO A VALUE
+				//  LOWER THAN THE SESSION_EXPIRY_INTERVAL CONFIGURED IN THE BROKER (mosquitto.conf) SO
+				// THAT THE BROKER KNOWS TO WAIT THAT AMOUNT OF TIME BEFORE PUBLISHING THE LWT ON DISCONNECTION.
+				// THIS WAY, IF THE CLIENT RECONNECTS WITHIN THAT TIME FRAME, THE BROKER WILL NOT PUBLISH THE
+				// LWT AND WILL DELETE IT INSTEAD.
+				// WillDelayInterval:     &WILL_DELAY_INTERVAL,
+				RequestProblemInfo: true,
+				TopicAliasMaximum:  &MAX_TOPIC_ALIAS,
+			},
+			WillMessage: &paho.WillMessage{
+				Topic:   fmt.Sprintf("%s/%s/status", API_VERSION, clientID),
+				Payload: willPayload,
+				QoS:     DEFAULT_QoS,
+				Retain:  true,
+			},
+		})
+		if err != nil {
+			conn.Close()
+			return fmt.Errorf("mqtt connect failed: %w", err)
+		}
+
+		// --- FIXED REDIRECTION HANDLING ENGINE ---
+		if connack.ReasonCode == mPackets.ErrServerMoved.Code {
+			if connack.Properties != nil && connack.Properties.ServerReference != "" {
+				// Update targetURL with the reference from Mochi (e.g. "127.0.0.1:1885")
+				targetURL = connack.Properties.ServerReference
+
+				b.logger.LogInfo(&logger.LoggerPayload{
+					Message: "Server redirected client, retrying target...",
+					Value:   map[string]string{"RedirectedTo": targetURL},
+				})
+
+				conn.Close() // Drop Mochi proxy socket
+				continue     // Loop back up and dial the redirected targetURL!
+			}
+			conn.Close()
+			return fmt.Errorf("server sent redirection code %x but omitted ServerReference", connack.ReasonCode)
+		}
+
+		if connack.ReasonCode != 0 {
+			conn.Close()
+			return fmt.Errorf("broker rejected connection (Reason Code: %d)", connack.ReasonCode)
+		}
+
+		// If we reach here, connection is successful (ReasonCode == 0)
+		b.isConnected = true
+		b.logger.LogInfo(&logger.LoggerPayload{Message: "Connected to broker", Value: targetURL})
+
+		// Send online status
+		onlinePayload, _ := utils.JsonMarshall(ServiceStatus{Event: SERVICE_STATUS, Status: ONLINE})
+		b.Publish(ctx, fmt.Sprintf("%s/%s/status", API_VERSION, clientID), onlinePayload, &PublishRequest{
+			QoS:    DEFAULT_QoS,
+			Retain: true,
+		})
+		return nil
 	}
 
-	b.client = paho.NewClient(paho.ClientConfig{
-		Conn: conn,
-		OnPublishReceived: []func(paho.PublishReceived) (bool, error){
-			b.handleIncomingPublish,
-		},
-		OnClientError:      b.onError,
-		OnServerDisconnect: b.onServerDisconnect,
-	})
+	return fmt.Errorf("failed to connect: max redirection cycles exceeded")
+}
 
-	willPayload, err := utils.JsonMarshall(ServiceStatus{
-		Event:  SERVICE_STATUS,
-		Status: OFFLINE,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to marshal LWT: %w", err)
-	}
+func (b *Transport) Client() *paho.Client {
+	return b.client
+}
 
-	protocolErr := packets.ConnackProtocolError
-	fmt.Printf("PROTO: %+v\n", protocolErr)
-
-	connack, err := b.client.Connect(ctx, &paho.Connect{
-		KeepAlive:    KEEP_ALIVE,
-		CleanStart:   true,
-		Username:     brokerConnection[types.MQTT_USER],
-		Password:     []byte(brokerConnection[types.MQTT_PASSWORD]),
-		ClientID:     clientID,
-		UsernameFlag: true,
-		PasswordFlag: true,
-		Properties: &paho.ConnectProperties{
-			SessionExpiryInterval: &SESSION_EXPIRY,
-			RequestResponseInfo:   true,
-			// THIS IS CAUSING THE BROKER TO NOT CONNECT. THIS IS BC CLEAN_START IS TRUE,
-			// MEANING THE CLIENT IS NOT ALLOWING THE BROKER TO STORE THE LWT FOR WHEN IT DISCONNECTS.
-			// THIS SHOULD BE FINE FOR OUR USE CASE BUT IF YOU WANT TO USE LWT WITH CLEAN_START TRUE,
-			// YOU NEED TO SET A WILL_DELAY_INTERVAL IN THE CONNECT PROPERTIES AND SET IT TO A VALUE
-			//  LOWER THAN THE SESSION_EXPIRY_INTERVAL CONFIGURED IN THE BROKER (mosquitto.conf) SO
-			// THAT THE BROKER KNOWS TO WAIT THAT AMOUNT OF TIME BEFORE PUBLISHING THE LWT ON DISCONNECTION.
-			// THIS WAY, IF THE CLIENT RECONNECTS WITHIN THAT TIME FRAME, THE BROKER WILL NOT PUBLISH THE
-			// LWT AND WILL DELETE IT INSTEAD.
-			// WillDelayInterval:     &WILL_DELAY_INTERVAL,
-			RequestProblemInfo: true,
-			TopicAliasMaximum:  &MAX_TOPIC_ALIAS,
-		},
-		WillProperties: &paho.WillProperties{
-			PayloadFormat: paho.Byte(PAYLOAD_FORMAT_UTF_8),
-			ContentType:   types.HEADER_APPLICATION_JSON,
-		},
-		WillMessage: &paho.WillMessage{
-			Topic:   fmt.Sprintf("%s/%s/status", API_VERSION, clientID),
-			Payload: willPayload,
-			QoS:     DEFAULT_QoS,
-			Retain:  true,
-		},
-	})
-
-	if err != nil {
-		return fmt.Errorf("mqtt connect failed: %w", err)
-	}
-	if connack.ReasonCode != 0 {
-		return fmt.Errorf("broker rejected connection (Reason Code: %d)", connack.ReasonCode)
-	}
-
-	b.logger.LogInfo(&logger.LoggerPayload{Message: "Connected to broker", Value: brokerConnection[types.MQTT_BROKER_URL]})
-
-	willPayload, err = utils.JsonMarshall(ServiceStatus{
-		Event:  SERVICE_STATUS,
-		Status: ONLINE,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to marshal LWT: %w", err)
-	}
-	b.Publish(ctx, fmt.Sprintf("%s/%s/status", API_VERSION, clientID), willPayload, &PublishRequest{
-		QoS:    DEFAULT_QoS,
-		Retain: true,
-	})
-	return nil
+func (b *Transport) IsConnectted() bool {
+	return b.client != nil && b.isConnected
 }
 
 func (b *Transport) Close() error {
@@ -487,4 +627,5 @@ func (b *Transport) onError(err error) {
 
 func (b *Transport) onServerDisconnect(d *paho.Disconnect) {
 	b.logger.LogWarnf("Server disconnected. Reason: %d", d.ReasonCode)
+	b.isConnected = false
 }

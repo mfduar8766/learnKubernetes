@@ -18,7 +18,7 @@ if [[ ! -f "$GO_WORK_FILE" ]]; then
   go work init
 
   # Add all modules to the workspace
-  go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
+  go work use ./api/users ./app-gateway ./initContainers/mqtt ./initContainers/mongo ./lib ./proxy
   echo "Workspace initialized successfully."
 fi
 
@@ -82,7 +82,7 @@ sleep 15
 
 echo "📦 Building MQTT Init Container: $MQTT_INIT_CONTAINER..."
 # Point to the specific Dockerfile inside the initContainers folder
-docker build -t $MQTT_INIT_CONTAINER -f initContainers/mqttInitContainer/Dockerfile .
+docker build -t $MQTT_INIT_CONTAINER -f initContainers/mqtt/Dockerfile .
 
 echo "🔍 Verifying binary existence..."
 if ! docker run --rm $MQTT_INIT_CONTAINER ls /usr/local/bin/init-exe >/dev/null 2>&1; then
@@ -132,11 +132,15 @@ $K8S_CMD apply -f ./redis/redis.pvc.yaml
 $K8S_CMD apply -f ./mongo/mongo.pvc.yaml
 
 $K8S_CMD delete deployment mqtt-deployment --ignore-not-found
+$K8S_CMD delete deployment mqtt2-deployment --ignore-not-found
 echo "⏳ Ensuring MQTT Deployment is fully removed..."
 $K8S_CMD wait --for=delete pod -l app=mqtt --timeout=30s
+$K8S_CMD wait --for=delete pod -l app=mqtt2 --timeout=30s
 $K8S_CMD delete pvc mqtt-pvc --ignore-not-found
+$K8S_CMD delete pvc mqtt2-pvc --ignore-not-found
 echo "⏳ Ensuring PVC is fully removed..."
 $K8S_CMD wait --for=delete pvc/mqtt-pvc --timeout=30s
+$K8S_CMD wait --for=delete pvc/mqtt2-pvc --timeout=30s
 $K8S_CMD apply -f ./mqtt/mqtt.pvc.yaml
 # ===================================================================================================
 echo "🚀 Deploying Dbs..."
@@ -149,6 +153,9 @@ $K8S_CMD apply -f ./mqtt/mqtt.deployment.yaml
 
 echo "⏳ Waiting for MQTT Broker to be Ready (1/1)..."
 $K8S_CMD rollout status deployment mqtt-deployment --timeout=90s
+
+echo "⏳ Waiting for MQTT2 Broker to be Ready (1/1)..."
+$K8S_CMD rollout status deployment mqtt2-deployment --timeout=90s
 
 # Wait for Redis && MongoDb
 echo "⏳ Waiting for Databases..."
