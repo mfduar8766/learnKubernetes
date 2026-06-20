@@ -236,7 +236,6 @@ func (p *Proxy) Provides(b byte) bool {
 }
 
 func (p *Proxy) OnACLCheck(cl *mqtt.Client, topic string, write bool) bool {
-	log.Printf("[ACL CHECK] Client '%s' requesting topic '%s' (Write: %v)", cl.ID, topic, write)
 	p.TopicMapMutex.RLock()
 	topicData, exists := p.TopicsMap[topic]
 	p.TopicMapMutex.RUnlock()
