@@ -15,7 +15,7 @@ type ITransport interface {
 	GetTopicType(topic string) *TopicProperties
 	Close() error
 	SubscribeMultiple(topics ...string)
-	Subscribe(ctx context.Context, topic string, properties *SubscribeProperties) error
+	Subscribe(ctx context.Context, options []paho.SubscribeOptions) error
 	UnsubscribeMultiple(topics ...string)
 	// Unsubscribes from the topics and called UnregisterHandler for each topic.
 	//

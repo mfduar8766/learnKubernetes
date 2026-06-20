@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/eclipse/paho.golang/paho"
 	"github.com/mfduar8766/learnKubernetes/app-gateway/views"
 	dashboard "github.com/mfduar8766/learnKubernetes/app-gateway/views/dashBoard"
 	"github.com/mfduar8766/learnKubernetes/lib/events"
@@ -258,9 +259,18 @@ func (rh *RequestHandler) getUsers(w http.ResponseWriter, r *http.Request) {
 // }
 
 func (rh *RequestHandler) Subscribe(topics ...string) {
+	var subs []paho.SubscribeOptions
 	for _, topic := range topics {
-		rh.broker.Subscribe(context.Background(), topic, nil)
+		subs = append(subs, paho.SubscribeOptions{
+			Topic: topic,
+			QoS:   transport.DEFAULT_QoS,
+		})
+		// rh.broker.Subscribe(context.Background(), topic, nil)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+	defer cancel()
+
+	rh.broker.Subscribe(ctx, subs)
 }
 
 func (rh *RequestHandler) Unsubscribe(topics ...string) {

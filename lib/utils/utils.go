@@ -8,12 +8,56 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/google/uuid"
 	"github.com/mfduar8766/learnKubernetes/lib/logger"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 )
+
+type EnvironmentVariablesConfig struct {
+	CurrentEnv              string `env:"CURRENT_ENV" envDefault:"dev"`
+	MqttBrokerURL           string `env:"MQTT_BROKER_URL" envDefault:"127.0.0.1:1883"`
+	MqttBrokerURLTLS        string `env:"MQTT_BROKER_URL_TLS" envDefault:""`
+	MqttUser                string `env:"MQTT_USER" envDefault:"user"`
+	MqttPassword            string `env:"MQTT_PASSWORD" envDefault:"password"`
+	RedisURL                string `env:"REDIS_URL" envDefault:"127.0.0.1:6379"`
+	RedisPassword           string `env:"REDIS_PASSWORD" envDefault:"password"`
+	MongoHost               string `env:"MONGO_HOST" envDefault:"127.0.0.1:27017"`
+	MongoInitDBRootUsername string `env:"MONGO_INITDB_ROOT_USERNAME" envDefault:"user"`
+	MongoInitDBRootPassword string `env:"MONGO_INITDB_ROOT_PASSWORD" envDefault:"password"`
+}
+
+// EnvConfig is a global variable that holds
+// the environment configuration for the
+// application. It is initialized by calling
+// NewEnvironmentVariablesConfig() during application startup.
+var EnvConfig *EnvironmentVariablesConfig = nil
+
+// TODO: Handle case of different CURRENT_ENV values.
+func NewEnvironmentVariablesConfig() {
+	sync.OnceFunc(func() {
+		var config EnvironmentVariablesConfig
+		err := env.Parse(&config)
+		if err != nil {
+			fmt.Printf("Failed to parse environment variables using defaults. Error: %v", err)
+			EnvConfig = &EnvironmentVariablesConfig{
+				CurrentEnv:              "dev",
+				MqttBrokerURL:           "127.0.0.1:1883",
+				MqttBrokerURLTLS:        "",
+				MqttUser:                "user",
+				MqttPassword:            "password",
+				RedisURL:                "127.0.0:1:6379",
+				RedisPassword:           "password",
+				MongoHost:               "127.0.0.1:27017",
+				MongoInitDBRootUsername: "user",
+				MongoInitDBRootPassword: "password",
+			}
+		}
+	})()
+}
 
 func HandleError(err error, method string, message string, log logger.ILogger) {
 	if err != nil {
@@ -128,12 +172,7 @@ func GetBrokerConnection(clientID string, tls bool) map[string]string {
 		types.MQTT_USER:     "user",
 		types.MQTT_PASSWORD: "password",
 	}
-	if clientID == "client1" {
-		brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
-	}
-	if clientID == "client2" {
-		brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
-	}
+	brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
 	return brokerConnectionMap
 }
 

@@ -16,6 +16,7 @@ import (
 	protos "github.com/mfduar8766/learnKubernetes/lib/protos/generated"
 	"github.com/mfduar8766/learnKubernetes/lib/types"
 	"github.com/mfduar8766/learnKubernetes/lib/utils"
+	"github.com/mochi-mqtt/server/v2/packets"
 	mPackets "github.com/mochi-mqtt/server/v2/packets"
 	"google.golang.org/protobuf/proto"
 )
@@ -384,9 +385,14 @@ func (b *Transport) PublishWithResponse(ctx context.Context, topic string, paylo
 	return responseChan
 }
 
+// TODO: FIx this later
 func (t *Transport) SubscribeMultiple(topics ...string) {
 	for _, topic := range topics {
-		t.Subscribe(context.Background(), topic, nil)
+		t.Subscribe(context.Background(), []paho.SubscribeOptions{
+			{
+				Topic: topic,
+			},
+		})
 	}
 }
 
@@ -394,23 +400,26 @@ func (t *Transport) UnsubscribeMultiple(topics ...string) {
 	t.Unsubscribe(context.Background(), topics...)
 }
 
-func (b *Transport) Subscribe(ctx context.Context, topic string, properties *SubscribeProperties) error {
-	subscribeProperties := paho.Subscribe{
-		Properties: &paho.SubscribeProperties{},
-		Subscriptions: []paho.SubscribeOptions{
-			{
-				Topic: topic,
-				QoS:   DEFAULT_QoS,
-			},
-		},
-	}
-	if properties != nil {
-		//
-	}
-	_, err := b.client.Subscribe(ctx, &subscribeProperties)
+func (b *Transport) Subscribe(ctx context.Context, options []paho.SubscribeOptions) error {
+	subAck, err := b.client.Subscribe(ctx, &paho.Subscribe{
+		Subscriptions: options,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("network error during subscribe: %w", err)
 	}
+
+	if subAck == nil {
+		return fmt.Errorf("Transport::Subscribe()::subAck is nil")
+	}
+
+	for index, reason := range subAck.Reasons {
+		// In MQTT v5, any reason code >= 0x80 (128) is an error/failure status code.
+		if reason >= packets.ErrUnspecifiedError.Code {
+			return fmt.Errorf("broker rejected subscription for topic index %d with reason code: 0x%X (%d)",
+				index, reason, reason)
+		}
+	}
+
 	return nil
 }
 
@@ -559,22 +568,43 @@ func (b *Transport) publish(ctx context.Context, topic string, payload []byte, p
 		b.pendingRequests[responseID] = responseID
 		b.reqResLock.Unlock()
 
-		err := b.Subscribe(ctx, responseTopic, &SubscribeProperties{
-			QoS: byte(subQoS),
+		err := b.Subscribe(ctx, []paho.SubscribeOptions{
+			{
+				Topic: responseTopic,
+				QoS:   byte(subQoS),
+			},
 		})
 		if err != nil {
 			return "", err
 		}
-		_, err = b.client.Publish(ctx, publish)
+		pubRes, err := b.client.Publish(ctx, publish)
 		if err != nil {
 			return "", err
 		}
+
+		if pubRes == nil {
+			return "", fmt.Errorf("Transport::publish()::no pub response from broker...")
+		}
+
+		if pubRes.ReasonCode >= packets.ErrUnspecifiedError.Code {
+			return "", fmt.Errorf("Transport::publish()::publish response not received for topic: %s", responseTopic)
+		}
+
 		return responseID, nil
 	}
-	_, err := b.client.Publish(ctx, publish)
+
+	pubRes, err := b.client.Publish(ctx, publish)
 	if err != nil {
 		return "", err
 	}
+	if pubRes == nil {
+		return "", fmt.Errorf("Transport::publish()::no pub response from broker...")
+	}
+
+	if pubRes.ReasonCode >= packets.ErrUnspecifiedError.Code {
+		return "", fmt.Errorf("Transport::publish()::publish response not received for topic: %s", topic)
+	}
+
 	return "", nil
 }
 
@@ -583,17 +613,6 @@ func (b *Transport) handleIncomingPublish(pr paho.PublishReceived) (bool, error)
 		return true, nil
 	}
 
-	// b.logger.LogDebug(&logger.LoggerPayload{
-	// 	Message: "handleIncomingPublish()::Msg",
-	// 	Value: map[string]any{
-	// 		"Topic":          pr.Packet.Topic,
-	// 		"ResponseTopic":  pr.Packet.Properties.ResponseTopic,
-	// 		"CorID":          string(pr.Packet.Properties.CorrelationData),
-	// 		"Payload":        string(pr.Packet.Payload),
-	// 		"userProperties": pr.Packet.Properties.User,
-	// 	},
-	// })
-
 	// Check for correlation data for Request-Response pattern
 	if len(pr.Packet.Properties.CorrelationData) > 0 {
 		correlationID := string(pr.Packet.Properties.CorrelationData)
@@ -601,7 +620,7 @@ func (b *Transport) handleIncomingPublish(pr paho.PublishReceived) (bool, error)
 		responseTopic := pr.Packet.Properties.User.Get(from)
 
 		_, exists := b.pendingRequests[correlationID]
-		if exists && len(from) > 0 && len(pr.Packet.Properties.ResponseTopic) > 0 && pr.Packet.Properties.ResponseTopic == responseTopic {
+		if exists && len(pr.Packet.Properties.ResponseTopic) > 0 && pr.Packet.Properties.ResponseTopic == responseTopic {
 			b.requestResponseChan[correlationID] <- &protos.BrokerResponse{
 				Payload:       pr.Packet.Payload,
 				Topic:         pr.Packet.Topic,
