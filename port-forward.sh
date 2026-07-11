@@ -10,11 +10,11 @@ REDIS_POD=$($K8S_CMD get pods -l app=redis -o jsonpath='{.items[0].metadata.name
 # INGRESS_POD=$($K8S_CMD get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx -o jsonpath='{.items[0].metadata.name}')
 # INGRESS_POD=$($K8S_CMD get ingress gateway-ingress -o jsonpath='{.items[0].metadata.name}')
 ROKER_POD2=$($K8S_CMD get pods -l app=mqtt2 -o jsonpath='{.items[0].metadata.name}')
-PROXY=$($K8S_CMD get pods -l app=proxy -o jsonpath='{.items[0].metadata.name}')
+# PROXY=$($K8S_CMD get pods -l app=proxy -o jsonpath='{.items[0].metadata.name}') No pod for proxy, using service instead
 
 # Check if pods were found to avoid errors
 if [ -z "$MONGO_POD" ] || [ -z "$BROKER_POD" ] || [ -z "$BROKER_POD2" ] || [ -z "$REDIS_POD" ]; then
-    echo "❌ Error: One or more pods not found. Check your labels!"
+    echo "Error: One or more pods not found. Check your labels!"
     exit 1
 fi
 

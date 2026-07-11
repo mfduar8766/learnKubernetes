@@ -148,32 +148,34 @@ func GetEnv(env string) string {
 }
 
 func GetBrokerConnection(clientID string, tls bool) map[string]string {
-	// currentENV := GetCurrentENV()
-	// if currentENV == types.PROD_ENV {
-	// 	brokerURL := GetEnv(types.MQTT_BROKER_URL)
-	// 	if tls {
-	// 		brokerURL = GetEnv(types.MQTT_BROKER_URL_TLS)
-	// 	}
+	currentENV := GetCurrentENV()
+	if currentENV == types.PROD_ENV {
+		brokerURL := GetEnv(types.MQTT_BROKER_URL)
+		if tls {
+			brokerURL = GetEnv(types.MQTT_BROKER_URL_TLS)
+		}
 
-	// 	brokerUser := GetEnv(types.MQTT_USER)
-	// 	brokerPassword := GetEnv(types.MQTT_PASSWORD)
-	// 	return map[string]string{
-	// 		types.MQTT_BROKER_URL: brokerURL,
-	// 		types.MQTT_USER:       brokerUser,
-	// 		types.MQTT_PASSWORD:   brokerPassword,
-	// 	}
-	// }
-	// return map[string]string{
-	// 	types.MQTT_BROKER_URL: "0.0.0.0:1883",
-	// 	types.MQTT_USER:       "user",
-	// 	types.MQTT_PASSWORD:   "password",
-	// }
-	var brokerConnectionMap map[string]string = map[string]string{
-		types.MQTT_USER:     "user",
-		types.MQTT_PASSWORD: "password",
+		brokerUser := GetEnv(types.MQTT_USER)
+		brokerPassword := GetEnv(types.MQTT_PASSWORD)
+		return map[string]string{
+			types.MQTT_BROKER_URL: brokerURL,
+			types.MQTT_USER:       brokerUser,
+			types.MQTT_PASSWORD:   brokerPassword,
+		}
 	}
-	brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
-	return brokerConnectionMap
+	return map[string]string{
+		types.MQTT_BROKER_URL: "127.0.0.1:1883",
+		types.MQTT_USER:       "user",
+		types.MQTT_PASSWORD:   "password",
+	}
+
+	// For PROXY TESTING
+	// var brokerConnectionMap map[string]string = map[string]string{
+	// 	types.MQTT_USER:     "user",
+	// 	types.MQTT_PASSWORD: "password",
+	// }
+	// brokerConnectionMap[types.MQTT_BROKER_URL] = "127.0.0.1:1883"
+	// return brokerConnectionMap
 }
 
 // func GetBrokerConnection(clientID string, isInternalBridge bool) map[string]string {

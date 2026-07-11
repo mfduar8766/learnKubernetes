@@ -218,6 +218,8 @@ echo "$MY_PASS" | sudo -S pkill -15 -f "[p]ort-forward" || echo "No processes fo
 sleep 2
 
 chmod +x ./port-forward.sh
+echo "Sleep for 5 seconds..."
+sleep 5
 echo "🔐 Starting Port-Forwarding for all services..."
 ./port-forward.sh "$MY_PASS"
 

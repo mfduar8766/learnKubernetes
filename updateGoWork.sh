@@ -32,6 +32,6 @@ go mod tidy
 cd ../../
 
 cd ./proxy/
-echo "Running go mod tidy in broker package..."
+echo "Running go mod tidy in proxy package..."
 go mod tidy
 cd ..
