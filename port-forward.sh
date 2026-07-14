@@ -9,15 +9,19 @@ BROKER_POD=$($K8S_CMD get pods -l app=mqtt -o jsonpath='{.items[0].metadata.name
 REDIS_POD=$($K8S_CMD get pods -l app=redis -o jsonpath='{.items[0].metadata.name}')
 # INGRESS_POD=$($K8S_CMD get pods -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx -o jsonpath='{.items[0].metadata.name}')
 # INGRESS_POD=$($K8S_CMD get ingress gateway-ingress -o jsonpath='{.items[0].metadata.name}')
+ROKER_POD2=$($K8S_CMD get pods -l app=mqtt2 -o jsonpath='{.items[0].metadata.name}')
+# PROXY=$($K8S_CMD get pods -l app=proxy -o jsonpath='{.items[0].metadata.name}') No pod for proxy, using service instead
 
 # Check if pods were found to avoid errors
-if [ -z "$MONGO_POD" ] || [ -z "$BROKER_POD" ] || [ -z "$REDIS_POD" ]; then
-    echo "❌ Error: One or more pods not found. Check your labels!"
+if [ -z "$MONGO_POD" ] || [ -z "$BROKER_POD" ] || [ -z "$BROKER_POD2" ] || [ -z "$REDIS_POD" ]; then
+    echo "Error: One or more pods not found. Check your labels!"
     exit 1
 fi
 
 echo "🚀 Starting port-forwards..."
-$K8S_CMD port-forward "$BROKER_POD" 1883:1883 --address 0.0.0.0 &
+$K8S_CMD port-forward "$PROXY" 1883:1883 --address 0.0.0.0 &
+$K8S_CMD port-forward "$BROKER_POD" 1884:1883 --address 0.0.0.0 &
+$K8S_CMD port-forward "$BROKER_POD2" 1885:1883 --address 0.0.0.0 &
 $K8S_CMD port-forward "$MONGO_POD" 27017:27017 &
 $K8S_CMD port-forward "$REDIS_POD" 6379:6379 &
 # $K8S_CMD port-forward "$INGRESS_POD" 80:80 -n ingress-nginx --address 0.0.0.0 &

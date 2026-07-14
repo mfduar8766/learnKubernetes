@@ -3,8 +3,10 @@ module github.com/mfduar8766/learnKubernetes/lib
 go 1.26.2
 
 require (
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/eclipse/paho.golang v0.23.0
 	github.com/google/uuid v1.6.0
+	github.com/mochi-mqtt/server/v2 v2.7.9
 	github.com/rabbitmq/amqp091-go v1.11.0
 	github.com/redis/go-redis/v9 v9.19.0
 	go.mongodb.org/mongo-driver/v2 v2.6.0

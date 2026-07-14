@@ -5,19 +5,19 @@ WORKDIR /src
 
 # 1. Copy manifests for lib and the init container to cache layers
 COPY lib/go.mod lib/go.sum ./lib/
-COPY initContainers/mqttInitContainer/go.mod initContainers/mqttInitContainer/go.sum ./initContainers/mqttInitContainer/
+COPY initContainers/mqtt/go.mod initContainers/mqtt/go.sum ./initContainers/mqtt/
 
 # 2. Download dependencies
-RUN cd initContainers/mqttInitContainer && go mod download && go mod verify
+RUN cd initContainers/mqtt && go mod download && go mod verify
 
 # 3. Copy the source code
 COPY lib/ ./lib/
-COPY initContainers/mqttInitContainer/ ./initContainers/mqttInitContainer/
+COPY initContainers/mqtt/ ./initContainers/mqtt/
 
 # 4. Build the statically linked binary
 # We target the specific folder where main.go lives
 # RUN cd initContainers/mqttInitContainer && CGO_ENABLED=0 GOOS=linux go build -o /init-exe .
-RUN cd initContainers/mqttInitContainer && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /init-exe .
+RUN cd initContainers/mqtt && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /init-exe .
 
 # --- STAGE 2: Final Image ---
 # Switching to plain alpine for a smaller, faster init container

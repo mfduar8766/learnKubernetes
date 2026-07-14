@@ -1,0 +1,25 @@
+server:
+  - name: "proxy"
+    type: "tcp"
+    port: 1883
+    protocol: "mqtt"
+    hooks:
+      - "OnPacketRead"
+      - "OnACLCheck"
+      - "OnConnect"
+      - "OnConnectAuthenticate"
+      - "OnSubscribe"
+      - "OnSubscribed"
+      - "OnPublish"
+      - "OnPublished"
+      - "OnDisconnect"
+
+acl_rules:
+  allowed_topics:
+    - topic: "app/v1/client/+/test"
+      allow_publish: true
+      allow_subscribe: true
+      topic_alias: 1
+      qos: 1
+      retain: false
+      subscription_identifier: 1

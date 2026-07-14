@@ -9,11 +9,13 @@ import (
 
 type ITransport interface {
 	Connect(ctx context.Context, clientID string, tls bool) error
+	Client() *paho.Client
+	IsConnectted() bool
 	BuildTopic(topicType TOPIC_TYPE, domains ...string) string
 	GetTopicType(topic string) *TopicProperties
 	Close() error
 	SubscribeMultiple(topics ...string)
-	Subscribe(ctx context.Context, topic string, properties *SubscribeProperties) error
+	Subscribe(ctx context.Context, options []paho.SubscribeOptions) error
 	UnsubscribeMultiple(topics ...string)
 	// Unsubscribes from the topics and called UnregisterHandler for each topic.
 	//
