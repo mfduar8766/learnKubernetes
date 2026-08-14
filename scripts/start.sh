@@ -3,24 +3,10 @@
 read -sp "Enter your sudo password: " MY_PASS
 echo "" # Just to move to a new line after typing
 
-echo "Executing get_protos.sh to install protoc and Go plugins..."
-chmod +x ./get_protos.sh
-./get_protos.sh
-
-chmod +x ./updateGoWork.sh
-./updateGoWork.sh
-
-GO_WORK_FILE="go.work"
-
-if [[ ! -f "$GO_WORK_FILE" ]]; then
-  echo "Creating go.work file..."
-  # Initialize the workspace
-  go work init
-
-  # Add all modules to the workspace
-  go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
-  echo "Workspace initialized successfully."
-fi
+cd scripts
+chmod +x ./setup.sh
+echo "Running setup.sh..."
+./setup.sh
 
 MINI_KUBE_WAIT_START_TIME=5
 
