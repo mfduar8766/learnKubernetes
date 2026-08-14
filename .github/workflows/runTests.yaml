@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.work
-          cache: true
+          go-version-file: "go.work"
+          cache-dependency-path: "**/*.sum" # Caches all sub-module dependencies
       - name: Run Unit Tests
         run: ./runTests.sh
