@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd ../
+
 echo "Update all go modules..."
 
 cd ./lib/
