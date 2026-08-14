@@ -21,8 +21,9 @@ jobs:
           go-version-file: "go.work"
           cache-dependency-path: "**/*.sum" # Caches all sub-module dependencies
       - name: Install Dependencies
+        working-directory: ./scripts
         run: |
-          chmod +x ./scripts/setUp.sh
-          ./scripts/setUp.sh
+          chmod +x /setUp.sh
+          ./setUp.sh
       - name: Run Unit Tests
         run: ./runTests.sh
