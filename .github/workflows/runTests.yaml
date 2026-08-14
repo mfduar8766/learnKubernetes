@@ -26,4 +26,7 @@ jobs:
           chmod +x ./setUp.sh
           ./setUp.sh
       - name: Run Unit Tests
-        run: ./runTests.sh
+        working-directory: ./scripts
+        run: |
+          chmod +x ./runTests.sh
+          ./runTests.sh

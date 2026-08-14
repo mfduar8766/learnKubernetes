@@ -7,13 +7,15 @@ cd ../
 echo "Update all go modules..."
 
 cd ./lib/
-echo "Running go mod tidy in lib package..."
-go mod tidy
+echo "Generating protobufs in lib package..."
 cd protos/
 echo "Running build.sh in protos package to generate Go code from .proto files..."
 chmod +x build.sh
 ./build.sh
-cd ../..
+cd ../
+echo "Running go mod tidy in lib package..."
+go mod tidy
+cd ../
 
 cd ./api/users/
 echo "Running go mod tidy in user service package..."
