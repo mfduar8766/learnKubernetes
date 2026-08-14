@@ -1,0 +1,25 @@
+name: Run Unit Tests
+on:
+  push:
+    branches:
+      ["master", "feature/*", "bugfix/*", "release/*", "!poc/*", "!test/*"]
+  pull_request:
+    branches:
+      ["master", "feature/*", "bugfix/*", "release/*", "!poc/*", "!test/*"]
+jobs:
+  run-tests:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./scripts
+    steps:
+      - name: Check out the repository to the runner
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run a script
+        run: ./runTests.sh
