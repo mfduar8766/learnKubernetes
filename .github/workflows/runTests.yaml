@@ -23,7 +23,7 @@ jobs:
       - name: Install Dependencies
         working-directory: ./scripts
         run: |
-          chmod +x /setUp.sh
+          chmod +x ./setUp.sh
           ./setUp.sh
       - name: Run Unit Tests
         run: ./runTests.sh
