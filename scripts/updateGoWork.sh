@@ -1,15 +1,21 @@
 #!/bin/bash
 
+set -e
+
+cd ../
+
 echo "Update all go modules..."
 
 cd ./lib/
-echo "Running go mod tidy in lib package..."
-go mod tidy
+echo "Generating protobufs in lib package..."
 cd protos/
 echo "Running build.sh in protos package to generate Go code from .proto files..."
 chmod +x build.sh
 ./build.sh
-cd ../..
+cd ../
+echo "Running go mod tidy in lib package..."
+go mod tidy
+cd ../
 
 cd ./api/users/
 echo "Running go mod tidy in user service package..."
@@ -35,3 +41,15 @@ cd ./broker
 echo "Running go mod tidy in broker package..."
 go mod tidy
 cd ..
+
+GO_WORK_FILE="go.work"
+
+if [[ ! -f "$GO_WORK_FILE" ]]; then
+  echo "Creating go.work file..."
+  # Initialize the workspace
+  go work init
+
+  # Add all modules to the workspace
+  go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
+  echo "Workspace initialized successfully."
+fi

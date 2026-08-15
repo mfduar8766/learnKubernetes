@@ -3,24 +3,10 @@
 read -sp "Enter your sudo password: " MY_PASS
 echo "" # Just to move to a new line after typing
 
-echo "Executing get_protos.sh to install protoc and Go plugins..."
-chmod +x ./get_protos.sh
-./get_protos.sh
-
-chmod +x ./updateGoWork.sh
-./updateGoWork.sh
-
-GO_WORK_FILE="go.work"
-
-if [[ ! -f "$GO_WORK_FILE" ]]; then
-  echo "Creating go.work file..."
-  # Initialize the workspace
-  go work init
-
-  # Add all modules to the workspace
-  go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
-  echo "Workspace initialized successfully."
-fi
+cd scripts
+chmod +x ./setup.sh
+echo "Running setup.sh..."
+./setup.sh
 
 MINI_KUBE_WAIT_START_TIME=5
 
@@ -79,25 +65,10 @@ sleep 15
 
 # =================================== Build Docker Containers ==================================================================
 # IMPORTANT: All builds must run from the ROOT (current directory) so Docker can see the /lib folder.
-
-echo "📦 Building MQTT Init Container: $MQTT_INIT_CONTAINER..."
-# Point to the specific Dockerfile inside the initContainers folder
-docker build -t $MQTT_INIT_CONTAINER -f initContainers/mqttInitContainer/Dockerfile .
-
-echo "🔍 Verifying binary existence..."
-if ! docker run --rm $MQTT_INIT_CONTAINER ls /usr/local/bin/init-exe >/dev/null 2>&1; then
-    echo "❌ ERROR: init-exe NOT FOUND in image! Build failed logic."
-    exit 1
-fi
-echo "✅ Binary confirmed. Proceeding with deployment..."
-
-echo "📦 Building GateWay: $GATE_WAY_IMG_NAME..."
-# Point to the app-gateway Dockerfile
-docker build -t $GATE_WAY_IMG_NAME -f app-gateway/Dockerfile .
-
-echo "📦 Building Users Service: $USERS_SERVICE_API_IMG_NAME..."
-# Point to the api/users Dockerfile
-docker build -t $USERS_SERVICE_API_IMG_NAME -f api/users/Dockerfile .
+cd ./scripts/
+chmod +x ./buildDockerImages.sh
+echo "Building Docker images..."
+./buildDockerImages.sh
 # ===========================================================================================================================
 
 cd k8s

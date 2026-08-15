@@ -3,30 +3,53 @@ FROM golang:1.26.2-alpine AS builder
 
 WORKDIR /src
 
-# 1. Copy manifests for both lib and the users service to cache layers
+ARG TAIL_WIND_VRSION=4.2.2
+
+# 1. Install dependencies
+ENV PATH="/go/bin:${PATH}"
+
+RUN echo "Using Tailwind CSS version: $TAIL_WIND_VRSION"
+
+# 1. Install dependencies (added protoc-dev for standard proto definitions)
+RUN apk add --no-cache bash protoc protobuf-dev
+
+# Create symlink so /usr/local/include finds standard Google proto files
+RUN mkdir -p /usr/local/include && \
+    ln -s /usr/include/google /usr/local/include/google
+
+# 2. Install your Go tools
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+    go install github.com/a-h/templ/cmd/templ@latest
+
+ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
+RUN chmod +x ./tailwindcss
+
+# 3. Copy manifests for both lib and the users service to cache layers
 COPY lib/go.mod lib/go.sum ./lib/
 COPY api/users/go.mod api/users/go.sum ./api/users/
 
-# 2. Download dependencies
-# This resolves your internal 'lib' dependency via the 'replace' in go.mod
-RUN cd api/users && go mod download && go mod verify
-
-# 3. Copy the source code for the required modules
+# 4. Copy the source code for the required modules
 COPY lib/ ./lib/
 COPY api/users/ ./api/users/
 
-# 4. Protobuf Generation
-RUN apk add --no-cache protoc
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+# 5. Generate protobufs
+RUN if [ -f lib/protos/build.sh ]; then \
+        echo "Found build.sh file, executing..."; \
+        cd lib/protos && chmod +x ./build.sh && bash ./build.sh; \
+    else \
+        echo "No build.sh file found..."; \
+        exit 1; \
+    fi
 
-# RUN chmod +x ./lib/protos/build.sh
-# RUN ./lib/protos/build.sh
+# 6. Download dependencies
+# This resolves your internal 'lib' dependency via the 'replace' in go.mod
+RUN cd api/users && go mod download && go mod verify
 
-# 5. Run quality checks
+# 7. Run quality checks
 RUN cd api/users && go test ./... && go vet ./...
 
-# 6. Build the statically linked binary
+# 7. Build the statically linked binary
 # We output it to a unique name: users-exe
 # RUN cd api/users && CGO_ENABLED=0 go build -v -o /users-exe .
 RUN cd api/users && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o /users-exe .
@@ -46,17 +69,3 @@ WORKDIR /
 
 # 3. Use the absolute path to avoid any ambiguity
 ENTRYPOINT ["/users-exe"]
-
-# # --- STAGE 2: Final Image ---
-# FROM alpine:latest
-
-# # Basic security certificates
-# RUN apk --no-cache add ca-certificates
-
-# # Copy only the final binary
-# COPY --from=builder /users-exe /users-exe
-
-# WORKDIR /
-
-# # Run the users service
-# CMD ["./users-exe"]
