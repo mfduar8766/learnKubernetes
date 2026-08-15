@@ -15,17 +15,17 @@ RUN go install github.com/a-h/templ/cmd/templ@latest
 COPY lib/go.mod lib/go.sum ./lib/
 COPY api/users/go.mod api/users/go.sum ./api/users/
 
-# 3. Generate protobufs
+# 3. Copy the source code for the required modules
+COPY lib/ ./lib/
+COPY api/users/ ./api/users/
+
+# 4. Generate protobufs
 RUN chmod +x ./lib/protos/build.sh
 RUN ./lib/protos/build.sh
 
-# 4. Download dependencies
+# 5. Download dependencies
 # This resolves your internal 'lib' dependency via the 'replace' in go.mod
 RUN cd api/users && go mod download && go mod verify
-
-# 5. Copy the source code for the required modules
-COPY lib/ ./lib/
-COPY api/users/ ./api/users/
 
 # 6. Run quality checks
 RUN cd api/users && go test ./... && go vet ./...

@@ -17,16 +17,16 @@ RUN go install github.com/a-h/templ/cmd/templ@latest
 COPY lib/go.mod lib/go.sum ./lib/
 COPY app-gateway/go.mod app-gateway/go.sum ./app-gateway/
 
-# 3. Generate protobufs
+# 3. Copy source code
+COPY lib/ ./lib/
+COPY app-gateway/ ./app-gateway/
+
+# 4. Generate protobufs
 RUN chmod +x ./lib/protos/build.sh
 RUN ./lib/protos/build.sh
 
-# 4. Download dependencies
+# 5. Download dependencies
 RUN cd app-gateway && go mod download && go mod verify
-
-# 5. Copy source code
-COPY lib/ ./lib/
-COPY app-gateway/ ./app-gateway/
 
 RUN cd app-gateway && go tool templ generate ./...
 RUN cd app-gateway && go test ./... && go vet ./...
