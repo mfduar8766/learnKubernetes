@@ -25,4 +25,4 @@ docker build -t $GATE_WAY_IMG_NAME -f app-gateway/Dockerfile .
 
 echo "📦 Building Users Service: $USERS_SERVICE_API_IMG_NAME..."
 # Point to the api/users Dockerfile
-docker build --build-arg $TAIL_WIND_VRSION -t $USERS_SERVICE_API_IMG_NAME -f api/users/Dockerfile .
+docker build --build-arg TAIL_WIND_VRSION=$TAIL_WIND_VRSION -t $USERS_SERVICE_API_IMG_NAME -f api/users/Dockerfile .
