@@ -1,6 +1,6 @@
 name: Build and Test Application
 env:
-  PREFIX: ${{ github.event_name == 'push' && "latest" || "pr" }}
+  PREFIX: ${{ github.event_name == 'push' && 'latest' || 'pr' }}
 on:
   push:
     branches:
