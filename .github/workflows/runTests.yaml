@@ -7,7 +7,7 @@ on:
       ["master", "feature/*", "bugfix/*", "release/*", "!poc/*", "!test/*"]
 jobs:
   set_up_and_test:
-    name: Run Unit Tests
+    name: Set Up Go Install Dependencies and Run Unit Tests
     runs-on: ubuntu-latest
     # defaults:
     #   run:
@@ -30,3 +30,15 @@ jobs:
         run: |
           chmod +x ./runTests.sh
           ./runTests.sh
+  build_docker_images:
+    name: Build Docker Images For All Services
+    runs-on: ubuntu-latest
+    needs: set_up_and_test
+    steps:
+      - name: Check out the repository to the runner
+        uses: actions/checkout@v6
+      - name: Build Docker Images
+        working-directory: ./scripts
+        run: |
+          chmod +x ./buildDockerImages.sh
+          ./buildDockerImages.sh
