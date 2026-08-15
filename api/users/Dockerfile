@@ -3,30 +3,34 @@ FROM golang:1.26.2-alpine AS builder
 
 WORKDIR /src
 
-# 1. Copy manifests for both lib and the users service to cache layers
-COPY lib/go.mod lib/go.sum ./lib/
-COPY api/users/go.mod api/users/go.sum ./api/users/
-
-# 2. Download dependencies
-# This resolves your internal 'lib' dependency via the 'replace' in go.mod
-RUN cd api/users && go mod download && go mod verify
-
-# 3. Copy the source code for the required modules
-COPY lib/ ./lib/
-COPY api/users/ ./api/users/
-
-# 4. Protobuf Generation
+# 1. Install dependencies
+ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
+RUN chmod +x ./tailwindcss
 RUN apk add --no-cache protoc
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+RUN go install github.com/a-h/templ/cmd/templ@latest
 
-# RUN chmod +x ./lib/protos/build.sh
-# RUN ./lib/protos/build.sh
+# 2. Copy manifests for both lib and the users service to cache layers
+COPY lib/go.mod lib/go.sum ./lib/
+COPY api/users/go.mod api/users/go.sum ./api/users/
 
-# 5. Run quality checks
+# 3. Generate protobufs
+RUN chmod +x ./lib/protos/build.sh
+RUN ./lib/protos/build.sh
+
+# 4. Download dependencies
+# This resolves your internal 'lib' dependency via the 'replace' in go.mod
+RUN cd api/users && go mod download && go mod verify
+
+# 5. Copy the source code for the required modules
+COPY lib/ ./lib/
+COPY api/users/ ./api/users/
+
+# 6. Run quality checks
 RUN cd api/users && go test ./... && go vet ./...
 
-# 6. Build the statically linked binary
+# 7. Build the statically linked binary
 # We output it to a unique name: users-exe
 # RUN cd api/users && CGO_ENABLED=0 go build -v -o /users-exe .
 RUN cd api/users && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o /users-exe .
