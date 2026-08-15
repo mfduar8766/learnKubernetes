@@ -1,9 +1,9 @@
 # --- STAGE 1: Build ---
 FROM golang:1.26.2-alpine AS builder
 
-WORKDIR /src
-
 ARG TAIL_WIND_VRSION=4.2.2
+
+WORKDIR /src
 
 # 1. Install dependencies
 ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
