@@ -78,7 +78,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: mfduar8766/${{ matrix.image_name }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}
           tags: |
             type=raw,value=${{ env.PREFIX }}_version_${{ steps.get_version.outputs.version }}_commit_{{sha}}_timestamp_{{date 'YYYY_MM_DD_time_HH_mm_ss'}}
       - name: Build and Push Docker Image
