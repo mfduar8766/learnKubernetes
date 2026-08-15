@@ -12,7 +12,7 @@ on:
 # Cancle previous run if another commit is pushed while in progress.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Cancel in-progress runs ONLY on Pull Requests / feature branches, not on master
+  # Cancel in-progress runs ONLY on Pull Requests / feature branches, not on master.
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 jobs:
   set_up_and_test:
