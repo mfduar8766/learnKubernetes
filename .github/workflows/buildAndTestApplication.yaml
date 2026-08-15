@@ -89,7 +89,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            ${{ matrix.pass_tailwind && "TAIL_WIND_VRSION=${{ env.TAIL_WIND_VRSION }}" || '' }}
+            ${{ matrix.pass_tailwind && 'TAIL_WIND_VRSION="${{ env.TAIL_WIND_VRSION }}"' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
