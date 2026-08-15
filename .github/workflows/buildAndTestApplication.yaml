@@ -90,10 +90,10 @@ jobs:
           tags:
             ${{ steps.meta.outputs.tags }}
             # Does not support nested expressions: ${{ ... ${{ }} }} so need to concat the strings.
+            # Nested Example: ${{ matrix.pass_tailwind && 'TAIL_WIND_VRSION=${{ env.TAIL_WIND_VRSION }}' || '' }}
             # Or add the env as a property on the matrix its self.
           build-args: |
             ${{ matrix.pass_tailwind && format('TAIL_WIND_VRSION={0}', env.TAIL_WIND_VRSION) || '' }}
-            # ${{ matrix.pass_tailwind && 'TAIL_WIND_VRSION=${{ env.TAIL_WIND_VRSION }}' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
