@@ -82,7 +82,7 @@ jobs:
         with:
           images: mfduar8766/${{ matrix.image_name }}
           tags: |
-            if [ "${{ github.event_name == ${{ env.PUSH }} }}" ]; then
+            if [ "${{ github.event_name }}" = "${{ env.PUSH }}" ]; then
               type=raw,value=${{ env.LATEST }}_version_${{ steps.get_version.outputs.version }}_commit_{{sha}}_timestamp_{{date 'YYYY_MM_DD_time_HH_mm_ss'}}
             else 
               type=raw,value=${{ env.PR }}_version_${{ steps.get_version.outputs.version }}_commit_{{sha}}_timestamp_{{date 'YYYY_MM_DD_time_HH_mm_ss'}}
