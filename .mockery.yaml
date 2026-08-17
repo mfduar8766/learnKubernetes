@@ -1,0 +1,25 @@
+all: true
+recursive: true
+filename: 'mocks/{{ replace "I" "" -1 .InterfaceName | snakecase }}/mock_{{ replace "I" "" -1 .InterfaceName | snakecase }}.go'
+force-file-write: true
+formatter: goimports
+log-level: info
+structname: "Mock{{ .InterfaceName }}"
+template: testify
+packages:
+  # Replace the relative paths with the absolute package paths from your go.mod
+  github.com/mfduar8766/learnKubernetes/api/users:
+    config:
+      all: true
+      recursive: true
+      pkgname: '{{ replace "I" "" -1 .InterfaceName | snakecase }}'
+  github.com/mfduar8766/learnKubernetes/app-gateway:
+    config:
+      all: true
+      recursive: true
+      pkgname: '{{ replace "I" "" -1 .InterfaceName | snakecase }}'
+  github.com/mfduar8766/learnKubernetes/lib:
+    config:
+      all: true
+      pkgname: '{{ replace "I" "" -1 .InterfaceName | snakecase }}'
+      recursive: true

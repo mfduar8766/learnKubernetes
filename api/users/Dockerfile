@@ -20,7 +20,8 @@ RUN mkdir -p /usr/local/include && \
 # 2. Install your Go tools
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
-    go install github.com/a-h/templ/cmd/templ@latest
+    go install github.com/a-h/templ/cmd/templ@latest && \
+    go install github.com/vektra/mockery/v3@v3.7.3
 
 ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
 RUN chmod +x ./tailwindcss
@@ -42,12 +43,14 @@ RUN if [ -f lib/protos/build.sh ]; then \
         exit 1; \
     fi
 
+RUN cd api/users && mockery
+
 # 6. Download dependencies
 # This resolves your internal 'lib' dependency via the 'replace' in go.mod
 RUN cd api/users && go mod download && go mod verify
 
 # 7. Run quality checks
-RUN cd api/users && go test ./... && go vet ./...
+RUN cd api/users && go test ./... -coverprofile=coverage.out && go vet ./...
 
 # 7. Build the statically linked binary
 # We output it to a unique name: users-exe
