@@ -43,7 +43,10 @@ RUN if [ -f lib/protos/build.sh ]; then \
         exit 1; \
     fi
 
-RUN cd api/users && mockery
+WORKDIR /api/users
+RUN mockery
+
+WORKDIR /src
 
 # 6. Download dependencies
 # This resolves your internal 'lib' dependency via the 'replace' in go.mod

@@ -42,7 +42,11 @@ RUN if [ -f lib/protos/build.sh ]; then \
         exit 1; \
     fi
 
-RUN cd app-gateway && mockery
+WORKDIR /app-gateway
+
+RUN mockery
+
+WORKDIR /src
 
 # 6. Download dependencies
 RUN cd app-gateway && go mod download && go mod verify

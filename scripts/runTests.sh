@@ -2,7 +2,7 @@
 
 set -e
 
-function runTests() {
+function run_Tests() {
     echo "Running unit tests and generating coverage profile..."
     
     if ! go test ./... -coverprofile=coverage.out; then
@@ -21,7 +21,7 @@ function runTests() {
     THRESHOLD=0.6
 
     # Compare floats using bc
-    if [ $(echo "$MY_NUM <= $THRESHOLD" | bc) -eq 1 ]; then
+    if [[ $(echo "$MY_NUM <= $THRESHOLD" | bc) -eq 1 ]]; then
         echo "❌ Coverage is less than or equal to ${THRESHOLD}% (Current: ${MY_NUM}%)"
         exit 1
     else
@@ -36,12 +36,12 @@ cd ..
 
 cd ./lib/
 echo "In Lib package, running go test..."
-runTests
+run_Tests
 
 cd ./app-gateway/
 echo "In app-gateway package, running go test..."
-runTests
+run_Tests
 
 cd ./api/users/
 echo "In user service package, running go test..."
-runTests
+run_Tests
