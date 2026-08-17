@@ -60,7 +60,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: ${{ secret.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION_KEY: ${{ secret.SONAR_ORGANIZATION_KEY }}           
+          SONAR_ORGANIZATION_KEY: ${{ secret.SONAR_ORGANIZATION_KEY }}
   build_and_publish_docker_images:
     name: Build and Publish Docker Images For All Services
     runs-on: ubuntu-latest
