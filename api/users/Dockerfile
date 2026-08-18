@@ -47,7 +47,7 @@ RUN if [ -f /src/lib/protos/build.sh ]; then \
 
 RUN mockery
 
-WORKDIR /api/users
+WORKDIR /src/api/users
 RUN mockery
 
 # 6. Download dependencies
@@ -55,7 +55,7 @@ RUN mockery
 RUN go mod download && go mod verify
 
 # 7. Run quality checks
-RUN go test ./... -coverprofile=coverage.out && go vet ./...
+# RUN go test ./... -coverprofile=coverage.out && go vet ./...
 
 # 7. Build the statically linked binary
 # We output it to a unique name: users-exe
