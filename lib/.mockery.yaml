@@ -1,0 +1,15 @@
+all: true
+recursive: true
+filename: 'mocks/{{ .InterfaceName | trimPrefix "I" | snakecase }}/mock_{{ .InterfaceName | trimPrefix "I" | snakecase }}.go'
+force-file-write: true
+formatter: goimports
+log-level: info
+structname: "Mock{{ .InterfaceName }}"
+template: testify
+
+packages:
+  github.com/mfduar8766/learnKubernetes/lib:
+    config:
+      all: true
+      recursive: true
+      pkgname: '{{ .InterfaceName | trimPrefix "I" | snakecase }}'

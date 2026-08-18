@@ -34,31 +34,33 @@ COPY api/users/go.mod api/users/go.sum ./api/users/
 COPY lib/ ./lib/
 COPY api/users/ ./api/users/
 
+WORKDIR /src/lib
+
 # 5. Generate protobufs
-RUN if [ -f lib/protos/build.sh ]; then \
+RUN if [ -f /src/lib/protos/build.sh ]; then \
         echo "Found build.sh file, executing..."; \
-        cd lib/protos && chmod +x ./build.sh && bash ./build.sh; \
+        cd /src/lib/protos && chmod +x ./build.sh && bash ./build.sh; \
     else \
         echo "No build.sh file found..."; \
         exit 1; \
     fi
 
+RUN mockery
+
 WORKDIR /api/users
 RUN mockery
 
-WORKDIR /src
-
 # 6. Download dependencies
 # This resolves your internal 'lib' dependency via the 'replace' in go.mod
-RUN cd api/users && go mod download && go mod verify
+RUN go mod download && go mod verify
 
 # 7. Run quality checks
-RUN cd api/users && go test ./... -coverprofile=coverage.out && go vet ./...
+RUN go test ./... -coverprofile=coverage.out && go vet ./...
 
 # 7. Build the statically linked binary
 # We output it to a unique name: users-exe
 # RUN cd api/users && CGO_ENABLED=0 go build -v -o /users-exe .
-RUN cd api/users && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o /users-exe .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o /users-exe .
 
 # --- STAGE 2: Final Image ---
 FROM alpine:latest

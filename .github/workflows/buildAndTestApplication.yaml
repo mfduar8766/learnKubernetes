@@ -48,6 +48,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: SonarQube Scan
+        # https://github.com/SonarSource/sonarqube-scan-action
         uses: SonarSource/sonarqube-scan-action@v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -82,6 +83,11 @@ jobs:
             dockerfile: api/users/Dockerfile
             version_file: api/users/version.txt
             pass_tailwind: true
+          - service: "app-mqtt"
+            image_name: "app-mqtt"
+            dockerfile: initContainers/mqttInitContainer/Dockerfile
+            version_file: initContainers/mqttInitContainer/version.txt
+            pass_tailwind: false
     steps:
       - name: Check out the repository to the runner
         # Uses: This tells GA to download and execute a reusable workflow block (Action).
