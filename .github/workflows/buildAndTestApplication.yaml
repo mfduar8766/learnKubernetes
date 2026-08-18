@@ -52,16 +52,16 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ secret.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION_KEY: ${{ secret.SONAR_ORGANIZATION_KEY }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION_KEY: ${{ secrets.SONAR_ORGANIZATION_KEY }}
       # This step checks the Quality Gate result and FAILS the GitHub job if coverage/quality is below threshold
       - name: SonarQube Quality Gate Check
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ secret.SONAR_PROJECT_KEY }}
-          SONAR_ORGANIZATION_KEY: ${{ secret.SONAR_ORGANIZATION_KEY }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION_KEY: ${{ secrets.SONAR_ORGANIZATION_KEY }}
   build_and_publish_docker_images:
     name: Build and Publish Docker Images For All Services
     runs-on: ubuntu-latest
