@@ -1,55 +1,39 @@
 #!/bin/bash
-
 set -e
 
-cd ../
+# Find the repository root dynamically regardless of where the script is called from
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
 
-echo "Update all go modules..."
-
-cd ./lib/
-echo "Generating protobufs in lib package..."
-cd protos/
-echo "Running build.sh in protos package to generate Go code from .proto files..."
-chmod +x build.sh
-./build.sh
-cd ../
-echo "Running go mod tidy in lib package..."
-go mod tidy
-cd ../
-
-cd ./api/users/
-echo "Running go mod tidy in user service package..."
-go mod tidy
-cd ../..
-
-cd ./app-gateway/
-echo "Running go mod tidy in app-gateway package..."
-go mod tidy
-cd ..
-
-cd ./initContainers/mqttInitContainer/
-echo "Running go mod tidy in mqttInitContainer package..."
-go mod tidy 
-cd ../../
-
-cd ./initContainers/mongoInit/
-echo "Running go mod tidy in mongoInitContainer package..."
-go mod tidy
-cd ../../
-
-cd ./broker
-echo "Running go mod tidy in broker package..."
-go mod tidy
-cd ..
-
-GO_WORK_FILE="go.work"
-
-if [[ ! -f "$GO_WORK_FILE" ]]; then
-  echo "Creating go.work file..."
-  # Initialize the workspace
-  go work init
-
-  # Add all modules to the workspace
-  go work use ./api/users ./app-gateway ./initContainers/mqttInitContainer ./lib
-  echo "Workspace initialized successfully."
+echo "==> Generating Protobufs in lib..."
+if [ -f "lib/protos/build.sh" ]; then
+  (cd lib/protos && chmod +x build.sh && ./build.sh)
 fi
+
+echo "==> Running go mod tidy across all modules..."
+MODULE_DIRS=(
+  "lib"
+  "api/users"
+  "app-gateway"
+  "initContainers/mqttInitContainer"
+  "initContainers/mongoInit"
+  "broker"
+)
+
+for dir in "${MODULE_DIRS[@]}"; do
+  if [ -d "$dir" ]; then
+    echo "  -> Tidy in $dir..."
+    (cd "$dir" && go mod tidy)
+  fi
+done
+
+echo "==> Syncing Go Workspace..."
+if [ ! -f "go.work" ]; then
+  echo "  -> Initializing go.work..."
+  go work init "${MODULE_DIRS[@]}"
+else
+  echo "  -> Syncing existing go.work..."
+  go work use "${MODULE_DIRS[@]}"
+fi
+
+echo "==> Done!"
