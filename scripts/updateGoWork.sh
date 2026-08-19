@@ -3,12 +3,18 @@ set -e
 
 # Find the repository root dynamically regardless of where the script is called from
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-echo "$REPO_ROOT"
+echo "ReoRoot: $REPO_ROOT"
 cd "$REPO_ROOT"
 
 echo "==> Generating Protobufs in lib..."
 if [ -f "lib/protos/build.sh" ]; then
   (cd lib/protos && chmod +x build.sh && ./build.sh)
+fi
+
+echo "==> Generating Mocks..."
+if [ -d "lib" ]; then
+  echo "  -> Running mockery in lib..."
+  (cd lib && mockery)
 fi
 
 echo "==> Running go mod tidy across all modules..."
