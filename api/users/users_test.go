@@ -3,14 +3,14 @@ package main
 import (
 	"testing"
 
-	"github.com/mfduar8766/learnKubernetes/lib/logger/mocks/i_logger"
-	"github.com/mfduar8766/learnKubernetes/lib/transport/mocks/i_transport"
+	"github.com/mfduar8766/learnKubernetes/lib/logger/mocks/logger"
+	"github.com/mfduar8766/learnKubernetes/lib/transport/mocks/transport"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetUsers(t *testing.T) {
-	var tMock *i_transport.MockITransport = i_transport.NewMockITransport(t)
-	var lMock *i_logger.MockILogger = i_logger.NewMockILogger(t)
+	var tMock *transport.MockITransport = transport.NewMockITransport(t)
+	var lMock *logger.MockILogger = logger.NewMockILogger(t)
 	user := NewUsers(tMock, lMock)
 	assert.NotNil(t, user)
 
