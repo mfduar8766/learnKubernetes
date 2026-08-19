@@ -2,6 +2,10 @@
 
 set -e
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+echo "ReoRoot: $REPO_ROOT"
+cd "$REPO_ROOT"
+
 function run_Tests() {
     echo "Running unit tests and generating coverage profile..."
     

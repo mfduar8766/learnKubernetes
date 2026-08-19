@@ -62,8 +62,15 @@ jobs:
       # 4. Finally, run tests
       - name: Run Unit Tests
         run: |
-          chmod +x ./scripts/runTests.sh
-          ./scripts/runTests.sh
+          echo "Testing lib..."
+          (cd lib && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
+          echo "Testing api/users..."
+          (cd api/users && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
+          echo "Testing app-gateway..."
+          (cd app-gateway && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
+
+          # chmod +x ./scripts/runTests.sh
+          # ./scripts/runTests.sh
   sonar_scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
