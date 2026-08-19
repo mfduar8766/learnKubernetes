@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Running protoc commnd..."
+
 mkdir -p generated
 
 protoc -I=. \

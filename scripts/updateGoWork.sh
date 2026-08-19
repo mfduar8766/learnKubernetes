@@ -3,6 +3,7 @@ set -e
 
 # Find the repository root dynamically regardless of where the script is called from
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+echo "$REPO_ROOT"
 cd "$REPO_ROOT"
 
 echo "==> Generating Protobufs in lib..."
@@ -22,7 +23,7 @@ MODULE_DIRS=(
 
 for dir in "${MODULE_DIRS[@]}"; do
   if [ -d "$dir" ]; then
-    echo "  -> Tidy in $dir..."
+    echo "  -> Running Go mod tidy in $dir..."
     (cd "$dir" && go mod tidy)
   fi
 done
