@@ -1,7 +1,9 @@
 name: Build and Test Application
+
 env:
   PREFIX: ${{ github.event_name == 'push' && 'latest' || 'pr' }}
   TAIL_WIND_VRSION: 4.2.2
+
 on:
   push:
     branches:
@@ -9,11 +11,13 @@ on:
   pull_request:
     branches:
       ["master", "feature/*", "bugfix/*", "release/*", "!poc/*", "!test/*"]
+
 # Cancle previous run if another commit is pushed while in progress.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Cancel in-progress runs ONLY on Pull Requests / feature branches, not on master.
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   set_up_and_test:
     name: Set Up Go, Install Dependencies, and Run Unit Tests
@@ -21,45 +25,34 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: "go.work"
           cache-dependency-path: "**/*.sum"
-
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install Tooling
         run: |
           go install github.com/vektra/mockery/v3@v3.7.3
           go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-      # 1. First, build proto files so generated code exists
       - name: Generate Protobufs
         run: |
           if [ -f "./lib/protos/build.sh" ]; then
             cd ./lib/protos && chmod +x build.sh && ./build.sh
           fi
-
-      # 2. Second, generate mocks in lib and api/users so mock packages exist
       - name: Generate Mocks
         run: |
           (cd lib && mockery)
           (cd api/users && mockery)
           (cd app-gateway && mockery)
-
-      # 3. Third, update Go workspace & go mod tidy (now all mock files exist!)
       - name: Update Go Workspace
         run: |
           chmod +x ./scripts/updateGoWork.sh
           ./scripts/updateGoWork.sh
-
-      # 4. Finally, run tests
       - name: Run Unit Tests
         run: |
           echo "Testing lib..."
@@ -68,9 +61,60 @@ jobs:
           (cd api/users && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
           echo "Testing app-gateway..."
           (cd app-gateway && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
+        # https://github.com/marketplace/actions/golang-govulncheck-action
+      # - name: Run Vulnerability Scans Lib
+      #   uses: golang/govulncheck-action
+      #   with:
+      #     work-dir: "lib"
+      #     go-version-file: "go.mod"
+      #     go-package: ./...
+      #     cache-dependency-path: "go.sum"
+      #     output-format: "json"
+      #     output-file: "tmp/vulnerabilities.json"
+      # - name: Run Vulnerability Scans AppGateWay
+      #   uses: golang/govulncheck-action
+      #   with:
+      #     work-dir: "app-gateway"
+      #     go-version-file: "go.mod"
+      #     go-package: ./...
+      #     cache-dependency-path: "go.sum"
+      #     output-format: "json"
+      #     output-file: "tmp/vulnerabilities.json"
+      # - name: Run Vulnerability Scans AppUsers
+      #   uses: golang/govulncheck-action
+      #   with:
+      #     work-dir: "api/users"
+      #     go-version-file: "go.mod"
+      #     go-package: ./...
+      #     cache-dependency-path: go.sum"
+      #     output-format: "json"
+      #     output-file: "tmp/vulnerabilities.json"
+      # - name: Run Vulnerability Scans MqttInitContainer
+      #   uses: golang/govulncheck-action
+      #   with:
+      #     work-dir: "initContainers/mqttInitContainer"
+      #     go-version-file: "go.mod"
+      #     go-package: ./...
+      #     cache-dependency-path: go.sum"
+      #     output-format: "json"
+      #     output-file: "tmp/vulnerabilities.json"
+      # run: |
+      #   go install golang.org/x/vuln/cmd/govulncheck@latest
+  vulnerability_scan:
+    name: Security Scan
+    strategy:
+      matrix:
+        module:
+          [
+            "app-gateway",
+            "api/users",
+            "lib",
+            "initContainers/mqttInitContainer",
+          ]
+    uses: ./.github/workflows/vulnerabilityScan.yaml
+    with:
+      module_dir: ${{ matrix.module }}
 
-          # chmod +x ./scripts/runTests.sh
-          # ./scripts/runTests.sh
   sonar_scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
@@ -94,6 +138,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
           SONAR_ORGANIZATION_KEY: ${{ secrets.SONAR_ORGANIZATION_KEY }}
+
   build_and_publish_docker_images:
     name: Build and Publish Docker Images For All Services
     runs-on: ubuntu-latest
