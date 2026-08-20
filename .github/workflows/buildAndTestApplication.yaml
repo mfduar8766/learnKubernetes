@@ -73,7 +73,7 @@ jobs:
       #     go-package: ./...
       #     cache-dependency-path: "go.sum"
       #     output-format: "json"
-      #     output-file: "tmp/vulnerabilities.json"
+      #     output-file: "vulnerabilities.json"
       # - name: Run Vulnerability Scans AppGateWay
       #   uses: golang/govulncheck-action
       #   with:
@@ -82,7 +82,7 @@ jobs:
       #     go-package: ./...
       #     cache-dependency-path: "go.sum"
       #     output-format: "json"
-      #     output-file: "tmp/vulnerabilities.json"
+      #     output-file: "vulnerabilities.json"
       # - name: Run Vulnerability Scans AppUsers
       #   uses: golang/govulncheck-action
       #   with:
@@ -91,7 +91,7 @@ jobs:
       #     go-package: ./...
       #     cache-dependency-path: go.sum"
       #     output-format: "json"
-      #     output-file: "tmp/vulnerabilities.json"
+      #     output-file: "vulnerabilities.json"
       # - name: Run Vulnerability Scans MqttInitContainer
       #   uses: golang/govulncheck-action
       #   with:
@@ -100,9 +100,11 @@ jobs:
       #     go-package: ./...
       #     cache-dependency-path: go.sum"
       #     output-format: "json"
-      #     output-file: "tmp/vulnerabilities.json"
+      #     output-file: "vulnerabilities.json"
       # run: |
       #   go install golang.org/x/vuln/cmd/govulncheck@latest
+
+  # This cannot be done as we need to install pkgs and a matrix pattern will not allow this
   vulnerability_scan:
     name: Security Scan
     strategy:
