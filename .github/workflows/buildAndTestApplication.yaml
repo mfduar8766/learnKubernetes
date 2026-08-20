@@ -3,6 +3,9 @@ name: Build and Test Application
 env:
   PREFIX: ${{ github.event_name == 'push' && 'latest' || 'pr' }}
   TAIL_WIND_VRSION: 4.2.2
+  APP_GATE_WAY: "app-gatway"
+  APP_USERS: "api/users"
+  APP_MQTT: "initContainers/mqttInitContainer"
 
 on:
   push:
