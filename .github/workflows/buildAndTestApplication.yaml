@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -106,12 +106,13 @@ jobs:
   vulnerability_scan:
     name: Security Scan
     strategy:
+      # Spins up independent actions for each array element
       matrix:
         module:
           [
+            "lib",
             "app-gateway",
             "api/users",
-            "lib",
             "initContainers/mqttInitContainer",
           ]
     uses: ./.github/workflows/vulnerabilityScan.yaml
@@ -169,7 +170,7 @@ jobs:
             version_file: initContainers/mqttInitContainer/version.txt
             pass_tailwind: false
     steps:
-      - name: Check out the repository to the runner
+      - name: Check out the repository
         # Uses: This tells GA to download and execute a reusable workflow block (Action).
         # actions/checkout: This referes to the path to the actual repo being used.
         # @v6: This is the version of that repo being used. So essentially this downloads the repo and executes it.
