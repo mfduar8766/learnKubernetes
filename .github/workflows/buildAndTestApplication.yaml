@@ -29,7 +29,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v6
       - name: Setup Go Workspace & Tools
-        uses: ./.github/actions/setupGoWorkspace.yaml
+        uses: ./.github/actions/setupGoWorkspace
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
         # - name: Set up Go

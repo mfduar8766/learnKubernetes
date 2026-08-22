@@ -7,7 +7,7 @@ echo "ReoRoot: $REPO_ROOT"
 cd "$REPO_ROOT"
 
 echo "==> Generating Protobufs in lib..."
-if [ -f "lib/protos/build.sh" ]; then
+if [[ -f "lib/protos/build.sh" ]]; then
   (cd lib/protos && chmod +x build.sh && ./build.sh)
 fi
 
@@ -30,14 +30,14 @@ MODULE_DIRS=(
 )
 
 for dir in "${MODULE_DIRS[@]}"; do
-  if [ -d "$dir" ]; then
+  if [[ -d "$dir" ]]; then
     echo "  -> Running Go mod tidy in $dir..."
     (cd "$dir" && go mod tidy)
   fi
 done
 
 echo "==> Syncing Go Workspace..."
-if [ ! -f "go.work" ]; then
+if [[ ! -f "go.work" ]]; then
   echo "  -> Initializing go.work..."
   go work init "${MODULE_DIRS[@]}"
 else
