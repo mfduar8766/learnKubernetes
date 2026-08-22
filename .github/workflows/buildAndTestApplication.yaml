@@ -64,51 +64,11 @@ jobs:
           (cd api/users && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
           echo "Testing app-gateway..."
           (cd app-gateway && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out)
-        # https://github.com/marketplace/actions/golang-govulncheck-action
-      # - name: Run Vulnerability Scans Lib
-      #   uses: golang/govulncheck-action
-      #   with:
-      #     work-dir: "lib"
-      #     go-version-file: "go.mod"
-      #     go-package: ./...
-      #     cache-dependency-path: "go.sum"
-      #     output-format: "json"
-      #     output-file: "vulnerabilities.json"
-      # - name: Run Vulnerability Scans AppGateWay
-      #   uses: golang/govulncheck-action
-      #   with:
-      #     work-dir: "app-gateway"
-      #     go-version-file: "go.mod"
-      #     go-package: ./...
-      #     cache-dependency-path: "go.sum"
-      #     output-format: "json"
-      #     output-file: "vulnerabilities.json"
-      # - name: Run Vulnerability Scans AppUsers
-      #   uses: golang/govulncheck-action
-      #   with:
-      #     work-dir: "api/users"
-      #     go-version-file: "go.mod"
-      #     go-package: ./...
-      #     cache-dependency-path: go.sum"
-      #     output-format: "json"
-      #     output-file: "vulnerabilities.json"
-      # - name: Run Vulnerability Scans MqttInitContainer
-      #   uses: golang/govulncheck-action
-      #   with:
-      #     work-dir: "initContainers/mqttInitContainer"
-      #     go-version-file: "go.mod"
-      #     go-package: ./...
-      #     cache-dependency-path: go.sum"
-      #     output-format: "json"
-      #     output-file: "vulnerabilities.json"
-      # run: |
-      #   go install golang.org/x/vuln/cmd/govulncheck@latest
-
-  # This cannot be done as we need to install pkgs and a matrix pattern will not allow this
+  # https://github.com/marketplace/actions/golang-govulncheck-action
   vulnerability_scan:
     name: Security Scan
     strategy:
-      # Spins up independent actions for each array element
+      # Spins up independent actions for each array element order is not guaranteed
       matrix:
         module:
           [
@@ -148,7 +108,7 @@ jobs:
   build_and_publish_docker_images:
     name: Build and Publish Docker Images For All Services
     runs-on: ubuntu-latest
-    needs: set_up_and_test
+    needs: ["set_up_and_test", "vulnerability_scan"]
     # A Strategy and Matrix allows you to run multiple variations of a single job simultaneously without duplicating the YAML code.
     # Strategy: A job settings that tells GithubActions how to handle multiple concurrent executions.
     # Matrix: A sub property of Strategy that allows for configuration of the runs. Each configured run is treated as a seperate job.
