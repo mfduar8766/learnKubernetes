@@ -1,8 +1,12 @@
 #!/bin/bash
 
-GATE_WAY_VERSION="v$(cat app-gateway/version.txt)"
-USERS_SERVICE_API_VERSION="v$(cat api/users/version.txt)"
-MQTT_INIT_CONTAINER_VERSION="v$(cat initContainers/mqttInitContainer/version.txt)"
+set -e
+
+cd ../
+
+GATE_WAY_VERSION="v$(cat ./app-gateway/version.txt)"
+USERS_SERVICE_API_VERSION="v$(cat ./api/users/version.txt)"
+MQTT_INIT_CONTAINER_VERSION="v$(cat ./initContainers/mqttInitContainer/version.txt)"
 DOCKER_HUB_USER="mfduar8766"
 
 GATE_WAY_IMG_NAME="app-gateway:$GATE_WAY_VERSION"
@@ -62,14 +66,14 @@ function buildImageTagAndPush() {
 echo "📦 Building MQTT Init Container: $MQTT_INIT_CONTAINER..."
 docker build --no-cache -t $MQTT_INIT_CONTAINER -f initContainers/mqttInitContainer/Dockerfile .
 verifyDockerImageExists $MQTT_INIT_CONTAINER
-buildImageTagAndPush $MQTT_INIT_CONTAINER
+# buildImageTagAndPush $MQTT_INIT_CONTAINER
 
 echo "📦 Building GateWay: $GATE_WAY_IMG_NAME..."
-docker build --no-cache --build-arg TAIL_WIND_VRSION=$TAIL_WIND_VRSION -t $GATE_WAY_IMG_NAME -f app-gateway/Dockerfile .
+docker build --no-cache --build-arg TAIL_WIND_VRSION=$TAIL_WIND_VRSION -t $GATE_WAY_IMG_NAME -f app-gateway/Dockerfile --progress=plain .
 verifyDockerImageExists $GATE_WAY_IMG_NAME
-buildImageTagAndPush $GATE_WAY_IMG_NAME
+# buildImageTagAndPush $GATE_WAY_IMG_NAME
 
 echo "📦 Building Users Service: $USERS_SERVICE_API_IMG_NAME..."
 docker build --no-cache --build-arg TAIL_WIND_VRSION=$TAIL_WIND_VRSION -t $USERS_SERVICE_API_IMG_NAME -f api/users/Dockerfile .
 verifyDockerImageExists $USERS_SERVICE_API_IMG_NAME
-buildImageTagAndPush $USERS_SERVICE_API_IMG_NAME
+# buildImageTagAndPush $USERS_SERVICE_API_IMG_NAME

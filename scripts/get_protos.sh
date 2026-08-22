@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 echo "Checking for protoc compiler..."
 if ! command -v protoc &> /dev/null; then
     echo "Installing protoc-gen-go and protoc-gen-go-grpc..."

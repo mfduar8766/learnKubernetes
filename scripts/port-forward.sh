@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 echo "🔍 Fetching pod names..."
 
 # Get Pod Names

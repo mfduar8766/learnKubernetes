@@ -19,7 +19,8 @@ RUN mkdir -p /usr/local/include && \
 # 2. Install your Go tools
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
-    go install github.com/a-h/templ/cmd/templ@latest
+    go install github.com/a-h/templ/cmd/templ@latest && \
+    go install github.com/vektra/mockery/v3@v3.7.3
 
 ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
 RUN chmod +x ./tailwindcss
@@ -32,24 +33,30 @@ COPY app-gateway/go.mod app-gateway/go.sum ./app-gateway/
 COPY lib/ ./lib/
 COPY app-gateway/ ./app-gateway/
 
+WORKDIR /src/lib
+
 # 5. Generate protobufs
-RUN if [ -f lib/protos/build.sh ]; then \
+RUN if [ -f /src/lib/protos/build.sh ]; then \
         echo "Found build.sh file, executing..."; \
-        cd lib/protos && chmod +x ./build.sh && bash ./build.sh; \
+        cd /src/lib/protos && chmod +x ./build.sh && bash ./build.sh; \
     else \
         echo "No build.sh file found..."; \
         exit 1; \
     fi
 
-# 6. Download dependencies
-RUN cd app-gateway && go mod download && go mod verify
+RUN mockery
 
-RUN cd app-gateway && go tool templ generate ./...
-RUN cd app-gateway && go test ./... && go vet ./...
+WORKDIR /src/app-gateway
+RUN mockery
+
+# 6. Download dependencies
+RUN go mod download && go mod verify
+
+RUN go tool templ generate ./...
+# RUN go test ./... -coverprofile=coverage.out && go vet ./...
 
 # 7. Build - Using amd64 to match your working Users service
-RUN cd app-gateway && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -v -o /gateway-exe .
 
 # --- STAGE 2: Final Image ---

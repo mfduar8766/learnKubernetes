@@ -3,6 +3,9 @@ go 1.26.2
 use (
 	./api/users
 	./app-gateway
+	./broker
+	./initContainers/mongoInit
+	./initContainers/mqttInitContainer
 	// ./initContainers/mongo
 	// ./initContainers/mqtt
 	./lib
