@@ -3,7 +3,7 @@ name: Run Cron Jobs
 on:
   schedule:
     # Minute, Hour, DayOfMonth, Month, DayOfTheWeek
-    - cron: "30 * * * *"
+    - cron: "5 * * * *"
   # Allows you to manually trigger the job fom the actions tab.
   workflow_dispatch:
 

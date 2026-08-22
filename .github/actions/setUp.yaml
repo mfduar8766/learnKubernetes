@@ -1,0 +1,30 @@
+name: Setup Go Workspace
+description: Used to set up the Go environment for builds
+
+inputs:
+  github_token:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: "go.work"
+        cache-dependency-path: "**/*.sum"
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v3
+      with:
+        repo-token: ${{ inputs.github_token }}
+    - name: Install Tooling & govulncheck
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+        go install github.com/a-h/templ/cmd/templ@latest
+        go install github.com/vektra/mockery/v3@v3.7.3
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+    - name: Update Go Workspace
+      run: |
+        chmod +x ./scripts/updateGoWork.sh
+        ./scripts/updateGoWork.sh
