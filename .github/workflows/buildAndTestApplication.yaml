@@ -85,6 +85,7 @@ jobs:
     uses: ./.github/workflows/vulnerabilityScan.yaml
     with:
       module_dir: ${{ matrix.module }}
+    secrets:
       github_token: ${{ secrets.GITHUB_TOKEN }}
 
   sonar_scan:
