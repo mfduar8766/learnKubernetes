@@ -67,6 +67,7 @@ jobs:
   # https://github.com/marketplace/actions/golang-govulncheck-action
   vulnerability_scan:
     name: Security Scan
+    if: github.ref_name != 'master'
     strategy:
       # Spins up independent actions for each array element order is not guaranteed
       matrix:
@@ -110,6 +111,10 @@ jobs:
     name: Build and Publish Docker Images For All Services
     runs-on: ubuntu-latest
     needs: ["set_up_and_test", "vulnerability_scan"]
+    if: |
+      always() &&
+      needs.set_up_and_test.result == 'success' &&
+      (needs.vulnerability_scan.result == 'success' || needs.vulnerability_scan.result == 'skipped')
     # A Strategy and Matrix allows you to run multiple variations of a single job simultaneously without duplicating the YAML code.
     # Strategy: A job settings that tells GithubActions how to handle multiple concurrent executions.
     # Matrix: A sub property of Strategy that allows for configuration of the runs. Each configured run is treated as a seperate job.
