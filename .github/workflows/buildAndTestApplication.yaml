@@ -43,6 +43,7 @@ jobs:
   # https://github.com/marketplace/actions/golang-govulncheck-action
   vulnerability_scan:
     name: Security Scan
+    # Run on NOT master branch
     if: github.ref_name != 'master'
     strategy:
       # Spins up independent actions for each array element order is not guaranteed
