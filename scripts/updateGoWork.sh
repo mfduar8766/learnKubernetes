@@ -12,12 +12,9 @@ if [[ -f "lib/protos/build.sh" ]]; then
 fi
 
 echo "==> Generating Mocks..."
-# if [ -d "lib" ]; then
-  # echo "  -> Running mockery in lib..."
   (cd lib && mockery)
   (cd api/users && mockery)
   (cd app-gateway && mockery)
-# fi
 
 echo "==> Running go mod tidy across all modules..."
 MODULE_DIRS=(
