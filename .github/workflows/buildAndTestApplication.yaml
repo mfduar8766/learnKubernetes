@@ -83,6 +83,7 @@ jobs:
 
   sonar_scan:
     name: SonarQube Scan
+    if: github.ref_name != 'master'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository to the runner
