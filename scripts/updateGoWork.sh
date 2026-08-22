@@ -17,7 +17,7 @@ echo "==> Generating Mocks..."
   (cd lib && mockery)
   (cd api/users && mockery)
   (cd app-gateway && mockery)
-fi
+# fi
 
 echo "==> Running go mod tidy across all modules..."
 MODULE_DIRS=(
