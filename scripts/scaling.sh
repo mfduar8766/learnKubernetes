@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 K8S_CMD="minikube kubectl --"
 
 echo "Scale up/down: (u/d)"

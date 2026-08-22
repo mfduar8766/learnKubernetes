@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 read -sp "Enter your sudo password: " MY_PASS
 echo "" # Just to move to a new line after typing
 

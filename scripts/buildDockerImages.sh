@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 cd ../
 
 GATE_WAY_VERSION="v$(cat ./app-gateway/version.txt)"
