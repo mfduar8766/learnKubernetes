@@ -8,6 +8,8 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Check out the repository
+      uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:

@@ -26,40 +26,10 @@ jobs:
     name: Set Up Go, Install Dependencies, and Run Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v6
       - name: Setup Go Workspace & Tools
         uses: ./.github/actions/setupGoWorkspace
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-        # - name: Set up Go
-        #   uses: actions/setup-go@v5
-        #   with:
-        #     go-version-file: "go.work"
-        #     cache-dependency-path: "**/*.sum"
-        # - name: Install Protoc
-        #   uses: arduino/setup-protoc@v3
-        #   with:
-        #     repo-token: ${{ secrets.GITHUB_TOKEN }}
-        # - name: Install Tooling
-        #   run: |
-        #     go install github.com/vektra/mockery/v3@v3.7.3
-        #     go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-        #     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-        # - name: Generate Protobufs
-        #   run: |
-        #     if [ -f "./lib/protos/build.sh" ]; then
-        #       cd ./lib/protos && chmod +x build.sh && ./build.sh
-        #     fi
-        # - name: Generate Mocks
-        #   run: |
-        #     (cd lib && mockery)
-        #     (cd api/users && mockery)
-        #     (cd app-gateway && mockery)
-        # - name: Update Go Workspace
-        #   run: |
-        #     chmod +x ./scripts/updateGoWork.sh
-        #     ./scripts/updateGoWork.sh
       - name: Run Unit Tests
         run: |
           echo "Testing lib..."
