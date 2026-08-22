@@ -26,6 +26,8 @@ jobs:
     name: Set Up Go, Install Dependencies, and Run Unit Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
       - name: Setup Go Workspace & Tools
         uses: ./.github/actions/setupGoWorkspace
         with:
