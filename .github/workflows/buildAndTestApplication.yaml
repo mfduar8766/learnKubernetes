@@ -28,34 +28,10 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Setup Go Workspace & Tools
+        uses: ./.github/actions/setupGoWorkspace
         with:
-          go-version-file: "go.work"
-          cache-dependency-path: "**/*.sum"
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install Tooling
-        run: |
-          go install github.com/vektra/mockery/v3@v3.7.3
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-      - name: Generate Protobufs
-        run: |
-          if [ -f "./lib/protos/build.sh" ]; then
-            cd ./lib/protos && chmod +x build.sh && ./build.sh
-          fi
-      - name: Generate Mocks
-        run: |
-          (cd lib && mockery)
-          (cd api/users && mockery)
-          (cd app-gateway && mockery)
-      - name: Update Go Workspace
-        run: |
-          chmod +x ./scripts/updateGoWork.sh
-          ./scripts/updateGoWork.sh
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Unit Tests
         run: |
           echo "Testing lib..."
@@ -178,19 +154,3 @@ jobs:
             ${{ matrix.pass_tailwind && format('TAIL_WIND_VRSION={0}', env.TAIL_WIND_VRSION) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # This is manually using a bash script to do the docker build and push for all services.
-  # The above job is using a matrix to build and push docker images for all services.
-  # The below job is commented out because it is not needed anymore.
-  # build_docker_images:
-  #   name: Build Docker Images For All Services
-  #   runs-on: ubuntu-latest
-  #   needs: set_up_and_test
-  #   steps:
-  #     - name: Check out the repository to the runner
-  #       uses: actions/checkout@v6
-  #     - name: Build Docker Images
-  #       working-directory: ./scripts
-  #       run: |
-  #         chmod +x ./buildDockerImages.sh
-  #         ./buildDockerImages.sh
