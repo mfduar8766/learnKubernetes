@@ -1,5 +1,5 @@
 # --- STAGE 1: Build ---
-FROM golang:1.26.2-alpine AS builder
+FROM golang:1.27.0-alpine3.24 AS builder
 
 WORKDIR /src
 
@@ -21,7 +21,7 @@ RUN mkdir -p /usr/local/include && \
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
     go install github.com/a-h/templ/cmd/templ@latest && \
-    go install github.com/vektra/mockery/v3@v3.7.3
+    go install github.com/vektra/mockery/v3@v3.7.4
 
 ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAIL_WIND_VRSION}/tailwindcss-linux-x64 ./tailwindcss
 RUN chmod +x ./tailwindcss

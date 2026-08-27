@@ -1,7 +1,5 @@
 package types
 
-import "fmt"
-
 type ResponsePayloadResultsType string
 type ResponsePayloadResults ResponsePayloadResultsType
 type DbType int
@@ -72,4 +70,4 @@ const (
 )
 
 // /api/v1/
-var API_ENDPOINT = fmt.Sprintf("/%s/%s/", API, API_VERSION)
+var API_ENDPOINT = "/" + API + "/" + API_VERSION + "/"
