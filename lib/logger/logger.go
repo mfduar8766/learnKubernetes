@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"os"
 	"os/signal"
@@ -27,16 +27,29 @@ FATAL = 4
 */
 type LogLevel int8
 
-const (
-	info = iota
-	warning
-	debug
-	error
-	fatal
-)
+// const (
+// 	info = iota
+// 	warning
+// 	debug
+// 	error
+// 	fatal
+// )
 
 func (l LogLevel) String() string {
-	return [...]string{"INFO", "WARNING", "DEBUG", "ERROR", "FATAL"}[l]
+	switch l {
+	case 0:
+		return "INFO"
+	case 1:
+		return "WARNING"
+	case 2:
+		return "DEBUG"
+	case 3:
+		return "ERROR"
+	case 4:
+		return "FATAL"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 func (l LogLevel) GetIndex() int8 {
@@ -44,13 +57,13 @@ func (l LogLevel) GetIndex() int8 {
 }
 
 type loggerPayload struct {
-	Level    string      `json:"level"`
-	Source   string      `json:"source"`
-	Time     string      `json:"time"`
-	Message  string      `json:"message,omitempty"`
-	Value    interface{} `json:"value,omitempty"`
-	FileName string      `json:"fileName,omitempty"`
-	Method   string      `json:"method,omitempty"`
+	Level    string `json:"level"`
+	Source   string `json:"source"`
+	Time     string `json:"time"`
+	Message  string `json:"message,omitempty"`
+	Value    any    `json:"value,omitempty"`
+	FileName string `json:"fileName,omitempty"`
+	Method   string `json:"method,omitempty"`
 }
 
 type LoggerPayload struct {
